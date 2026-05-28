@@ -87,7 +87,7 @@ void imu_calibrate() {
     printf("baseX: %.3f g | baseY: %.3f g | baseZ: %.3f g\n", baseX, baseY, baseZ);
 }
 
-void imu_read_data(float* vibration, float* deltaX, float* deltaY, float* deltaZ, 
+void imu_read_data(float* vibration, float* vibration_ms2, float* deltaX, float* deltaY, float* deltaZ, 
                    float* accX_ms2, float* accY_ms2, float* accZ_ms2, 
                    float* pitch, float* roll) {
     int16_t accX_raw = read16(ACC_X_LSB);
@@ -103,6 +103,7 @@ void imu_read_data(float* vibration, float* deltaX, float* deltaY, float* deltaZ
     *deltaZ = accZ_g - baseZ;
 
     *vibration = sqrt((*deltaX) * (*deltaX) + (*deltaY) * (*deltaY) + (*deltaZ) * (*deltaZ));
+    *vibration_ms2 = (*vibration) * 9.80665;
 
     *roll = atan2(accY_g, accZ_g) * 180.0 / M_PI;
     *pitch = atan2(-accX_g, sqrt(accY_g * accY_g + accZ_g * accZ_g)) * 180.0 / M_PI;

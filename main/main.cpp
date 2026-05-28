@@ -26,10 +26,10 @@ extern "C" void app_main(void) {
     bool motorForwardDirection = true;
 
     while (1) {
-        float vibration, deltaX, deltaY, deltaZ;
+        float vibration, vibration_ms2, deltaX, deltaY, deltaZ;
         float accX_ms2, accY_ms2, accZ_ms2, pitch, roll;
         
-        imu_read_data(&vibration, &deltaX, &deltaY, &deltaZ, 
+        imu_read_data(&vibration, &vibration_ms2, &deltaX, &deltaY, &deltaZ, 
                       &accX_ms2, &accY_ms2, &accZ_ms2, &pitch, &roll);
 
         int pwmValue = pot_read_pwm();
@@ -76,7 +76,7 @@ extern "C" void app_main(void) {
             printf("DIAM    | ");
         }
 
-        printf("vibration: %.3f g | dX: %.3f | dY: %.3f | dZ: %.3f\n", vibration, deltaX, deltaY, deltaZ);
+        printf("vibration: %.3f g (%.3f m/s2) | dX: %.3f | dY: %.3f | dZ: %.3f\n", vibration, vibration_ms2, deltaX, deltaY, deltaZ);
         
         printf("Data Accelerometer m/s², pitch, and roll!!\n");
         printf("Acc X: %.2f m/s2 | Y: %.2f m/s2 | Z: %.2f m/s2 || Pitch: %.2f deg | Roll: %.2f deg\n", 

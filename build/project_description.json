@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "combined_imu_motor",
-    "project_version":    "79670d8",
+    "project_version":    "09ea544-dirty",
     "project_path":       "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor",
     "idf_path":           "C:/esp/v5.3.3/esp-idf",
     "build_dir":          "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/build",
