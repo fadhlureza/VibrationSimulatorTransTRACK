@@ -13,7 +13,7 @@ float baseZ = 0;
 #define R_EN_PIN  11
 #define L_EN_PIN  12
 
-#define POT_PIN   1
+#define POT_PIN   4
 
 #define START_BTN_PIN  35
 #define STOP_BTN_PIN   36

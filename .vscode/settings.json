@@ -1,0 +1,17 @@
+{
+  "idf.currentSetup": "C:\\esp\\v5.3.3\\esp-idf",
+  "idf.portWin": "COM13",
+  "idf.flashType": "UART",
+  "idf.openOcdConfigs": [
+    "board/esp32s3-builtin.cfg"
+  ],
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32s3"
+  },
+  "clangd.path": "C:\\Espressif\\tools\\esp-clang\\16.0.1-fe4f10a809\\esp-clang\\bin\\clangd.exe",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=c:\\Users\\User\\Documents\\UI\\semester 6\\TransTRACK\\Combined_IMU_Motor\\build"
+  ]
+}
