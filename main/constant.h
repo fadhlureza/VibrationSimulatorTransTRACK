@@ -7,6 +7,11 @@ extern volatile bool start_btn_flag;
 extern volatile bool stop_btn_flag;
 extern volatile bool dir_btn_flag;
 
+// Button GPIO pins
+#define START_BTN_PIN  GPIO_NUM_35
+#define STOP_BTN_PIN   GPIO_NUM_36
+#define DIR_BTN_PIN    GPIO_NUM_37
+
 void button_init();
 
 // Motor
@@ -15,9 +20,27 @@ void motorStop();
 void motorForward(int speedPWM);
 void motorReverse(int speedPWM);
 
+//Motor GPIO pins
+#define RPWM_PIN  13
+#define LPWM_PIN  14
+#define R_EN_PIN  11
+#define L_EN_PIN  12
+
+// LEDC (PWM) parameters
+#define LEDC_TIMER              LEDC_TIMER_0
+#define LEDC_MODE               LEDC_LOW_SPEED_MODE
+#define LEDC_R_CHANNEL          LEDC_CHANNEL_0
+#define LEDC_L_CHANNEL          LEDC_CHANNEL_1
+#define LEDC_DUTY_RES           LEDC_TIMER_8_BIT
+#define LEDC_FREQUENCY          1000
+
 // Potentiometer
 void pot_init();
 int pot_read_pwm();
+
+// Potentiometer ADC parameters
+#define POT_ADC_UNIT    ADC_UNIT_1
+#define POT_ADC_CHANNEL ADC_CHANNEL_3
 
 // IMU
 void imu_init();
@@ -26,12 +49,27 @@ void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_
                     float* accX_ms2, float* accY_ms2, float* accZ_ms2,
                     float* pitch, float* roll);
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+// IMU parameters
+#define BMI160_ADDR 0x68
+#define CMD_REG    0x7E
+#define ACC_X_LSB  0x12
+#define ACC_RANGE 0x41
+
+// I2C parameters
+#define I2C_MASTER_SCL_IO           41
+#define I2C_MASTER_SDA_IO           42
+#define I2C_MASTER_NUM              I2C_NUM_0
+#define I2C_MASTER_FREQ_HZ          100000
+#define I2C_MASTER_TX_BUF_DISABLE   0
+#define I2C_MASTER_RX_BUF_DISABLE   0
+#define I2C_MASTER_TIMEOUT_MS       1000
 
 // Wi-Fi AP
 void wifi_init_softap(void);
+#define ESP_WIFI_SSID      "IMU_Sensor_AP"
+#define ESP_WIFI_PASS      "12345678"
+#define ESP_WIFI_CHANNEL   1
+#define ESP_MAX_STA_CONN   4
 
 // Web Server
 void start_webserver(void);
@@ -44,7 +82,3 @@ extern float g_calibrated_ms2;
 // Shared Potentiometer data
 extern volatile int g_pot_raw;
 extern volatile int g_pwm_value;
-
-#ifdef __cplusplus
-}
-#endif

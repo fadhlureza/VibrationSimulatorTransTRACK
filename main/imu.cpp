@@ -5,19 +5,6 @@
 #include "freertos/task.h"
 #include "driver/i2c.h"
 
-#define BMI160_ADDR 0x68
-#define CMD_REG    0x7E
-#define ACC_X_LSB  0x12
-#define ACC_RANGE 0x41
-
-#define I2C_MASTER_SCL_IO           41
-#define I2C_MASTER_SDA_IO           42
-#define I2C_MASTER_NUM              I2C_NUM_0
-#define I2C_MASTER_FREQ_HZ          100000
-#define I2C_MASTER_TX_BUF_DISABLE   0
-#define I2C_MASTER_RX_BUF_DISABLE   0
-#define I2C_MASTER_TIMEOUT_MS       1000
-
 static float baseX = 0;
 static float baseY = 0;
 static float baseZ = 0;

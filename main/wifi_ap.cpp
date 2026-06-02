@@ -9,11 +9,6 @@
 #include "nvs_flash.h"
 #include "constant.h"
 
-#define ESP_WIFI_SSID      "IMU_Sensor_AP"
-#define ESP_WIFI_PASS      "12345678"
-#define ESP_WIFI_CHANNEL   1
-#define ESP_MAX_STA_CONN   4
-
 static const char *TAG = "wifi softAP";
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)

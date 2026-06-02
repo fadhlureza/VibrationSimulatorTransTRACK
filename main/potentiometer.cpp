@@ -1,9 +1,6 @@
 #include "constant.h"
 #include "esp_adc/adc_oneshot.h"
 
-#define POT_ADC_UNIT    ADC_UNIT_1
-#define POT_ADC_CHANNEL ADC_CHANNEL_3
-
 static adc_oneshot_unit_handle_t adc1_handle;
 
 void pot_init() {

@@ -3,10 +3,6 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 
-#define START_BTN_PIN  GPIO_NUM_35
-#define STOP_BTN_PIN   GPIO_NUM_36
-#define DIR_BTN_PIN    GPIO_NUM_37
-
 volatile bool start_btn_flag = false;
 volatile bool stop_btn_flag = false;
 volatile bool dir_btn_flag = false;

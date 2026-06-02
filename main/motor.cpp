@@ -2,18 +2,6 @@
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 
-#define RPWM_PIN  13
-#define LPWM_PIN  14
-#define R_EN_PIN  11
-#define L_EN_PIN  12
-
-#define LEDC_TIMER              LEDC_TIMER_0
-#define LEDC_MODE               LEDC_LOW_SPEED_MODE
-#define LEDC_R_CHANNEL          LEDC_CHANNEL_0
-#define LEDC_L_CHANNEL          LEDC_CHANNEL_1
-#define LEDC_DUTY_RES           LEDC_TIMER_8_BIT
-#define LEDC_FREQUENCY          1000
-
 void motor_init() {
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_INTR_DISABLE;
