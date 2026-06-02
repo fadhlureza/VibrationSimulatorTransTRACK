@@ -12,14 +12,6 @@ extern volatile bool dir_btn_flag;
 #define STOP_BTN_PIN   GPIO_NUM_36
 #define DIR_BTN_PIN    GPIO_NUM_37
 
-void button_init();
-
-// Motor
-void motor_init();
-void motorStop();
-void motorForward(int speedPWM);
-void motorReverse(int speedPWM);
-
 //Motor GPIO pins
 #define RPWM_PIN  13
 #define LPWM_PIN  14
@@ -34,20 +26,9 @@ void motorReverse(int speedPWM);
 #define LEDC_DUTY_RES           LEDC_TIMER_8_BIT
 #define LEDC_FREQUENCY          1000
 
-// Potentiometer
-void pot_init();
-int pot_read_pwm();
-
 // Potentiometer ADC parameters
 #define POT_ADC_UNIT    ADC_UNIT_1
 #define POT_ADC_CHANNEL ADC_CHANNEL_3
-
-// IMU
-void imu_init();
-void imu_calibrate();
-void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_calibrated, float* deltaX, float* deltaY, float* deltaZ, 
-                    float* accX_ms2, float* accY_ms2, float* accZ_ms2,
-                    float* pitch, float* roll);
 
 // IMU parameters
 #define BMI160_ADDR 0x68

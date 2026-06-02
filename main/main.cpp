@@ -3,6 +3,10 @@
 #include "freertos/task.h"
 
 #include "constant.h"
+#include "imu/imu.h"
+#include "motor/motor.h"
+#include "button/button.h"
+#include "potentiometer/potentiometer.h"
 
 float g_vibration_g = 0.0f;
 float g_calibrated_g = 0.0f;
