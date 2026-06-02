@@ -4,10 +4,17 @@
 
 #include "constant.h"
 
+float g_vibration_g = 0.0f;
+float g_calibrated_g = 0.0f;
+float g_calibrated_ms2 = 0.0f;
+
 extern "C" void app_main(void) {
 
     printf("Initializing...\n");
     
+    wifi_init_softap();
+    start_webserver();
+
     imu_init();
     imu_calibrate();
     
@@ -29,6 +36,10 @@ extern "C" void app_main(void) {
         
         imu_read_data(&vibration, &vibration_ms2, &vibration_ms2_calibrated, &deltaX, &deltaY, &deltaZ, 
                       &accX_ms2, &accY_ms2, &accZ_ms2, &pitch, &roll);
+
+        g_vibration_g = vibration;
+        g_calibrated_ms2 = vibration_ms2_calibrated;
+        g_calibrated_g = vibration_ms2_calibrated / 9.80665f;
 
         int pwmValue = pot_read_pwm();
 

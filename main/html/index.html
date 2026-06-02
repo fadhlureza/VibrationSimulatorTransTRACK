@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IMU Sensor Data</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f4; margin: 0; padding: 20px; }
+        .canvas-container { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        canvas { background-color: #fff; border: 1px solid #ccc; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { margin-bottom: 20px; color: #333; }
+        h3 { margin: 5px 0; color: #555; }
+        .graph-wrapper { display: flex; flex-direction: column; align-items: center; }
+    </style>
+</head>
+<body>
+    <h1>IMU Graphs realtime</h1>
+    <div class="canvas-container">
+        <div class="graph-wrapper">
+            <h3>Pure (g)</h3>
+            <canvas id="pureGCanvas" width="800" height="150"></canvas>
+        </div>
+        <div class="graph-wrapper">
+            <h3>Calibrated (g)</h3>
+            <canvas id="calibratedGCanvas" width="800" height="150"></canvas>
+        </div>
+        <div class="graph-wrapper">
+            <h3>Calibrated (m/s&sup2;)</h3>
+            <canvas id="calibratedMs2Canvas" width="800" height="150"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const MAX_POINTS = 100;
+
+        function setupCanvas(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext("2d");
+            const data = Array(MAX_POINTS).fill(0);
+            return { canvas, ctx, data };
+        }
+
+        const graphs = {
+            pureG: setupCanvas("pureGCanvas"),
+            calG: setupCanvas("calibratedGCanvas"),
+            calMs2: setupCanvas("calibratedMs2Canvas")
+        };
+
+        function drawGraph(graph, label, color, maxValue) {
+            const { canvas, ctx, data } = graph;
+            const w = canvas.width;
+            const h = canvas.height;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // Draw grid
+            ctx.strokeStyle = "#eee";
+            ctx.beginPath();
+            for (let i = 0; i < 5; i++) {
+                const y = i * (h / 4);
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+            }
+            ctx.stroke();
+
+            // Draw max value text
+            ctx.fillStyle = "#888";
+            ctx.font = "12px Arial";
+            ctx.fillText(maxValue.toFixed(2) + " " + label, 5, 15);
+            ctx.fillText("0 " + label, 5, h - 5);
+
+            // Draw data line
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            const dx = w / (MAX_POINTS - 1);
+            const scale = (value) => h - (Math.min(value, maxValue) / maxValue) * h;
+
+            for (let i = 0; i < MAX_POINTS; i++) {
+                const x = i * dx;
+                const y = scale(data[i]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+
+        function updateData(graph, newValue) {
+            graph.data.push(newValue);
+            graph.data.shift();
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/data');
+                const json = await response.json();
+
+                updateData(graphs.pureG, json.vibration_g);
+                updateData(graphs.calG, json.calibrated_g);
+                updateData(graphs.calMs2, json.calibrated_ms2);
+
+                drawGraph(graphs.pureG, "g", "blue", 4);
+                drawGraph(graphs.calG, "g", "green", 4);
+                drawGraph(graphs.calMs2, "m/s2", "red", 40);
+
+            } catch (err) {
+                console.error("Error fetching data:", err);
+            }
+            // Fetch every 100ms
+            setTimeout(fetchData, 100);
+        }
+
+        drawGraph(graphs.pureG, "g", "blue", 4);
+        drawGraph(graphs.calG, "g", "green", 4);
+        drawGraph(graphs.calMs2, "m/s2", "red", 40);
+
+        fetchData();
+    </script>
+</body>
+</html>

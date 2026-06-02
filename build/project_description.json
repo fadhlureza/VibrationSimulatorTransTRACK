@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "combined_imu_motor",
-    "project_version":    "5a69dd2-dirty",
+    "project_version":    "866cdf9-dirty",
     "project_path":       "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor",
     "idf_path":           "C:/esp/v5.3.3/esp-idf",
     "build_dir":          "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/build",
@@ -1180,7 +1180,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/build/esp-idf/main/libmain.a",
-            "sources": [ "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/main/main.cpp", "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/main/imu.cpp", "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/main/motor.cpp", "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/main/button.cpp", "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/main/potentiometer.cpp" ],
+            "sources": [ "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/main/web_server.cpp", "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/main/wifi_ap.cpp", "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/main/main.cpp", "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/main/imu.cpp", "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/main/motor.cpp", "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/main/button.cpp", "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/main/potentiometer.cpp", "C:/Users/User/Documents/UI/semester 6/TransTRACK/Combined_IMU_Motor/build/index.html.S" ],
             "include_dirs": [ "." ]
         },
         "mbedtls": {

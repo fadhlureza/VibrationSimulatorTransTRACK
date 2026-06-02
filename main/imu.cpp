@@ -11,7 +11,7 @@
 #define ACC_RANGE 0x41
 
 #define I2C_MASTER_SCL_IO           41
-#define I2C_MASTER_SDA_IO           40
+#define I2C_MASTER_SDA_IO           42
 #define I2C_MASTER_NUM              I2C_NUM_0
 #define I2C_MASTER_FREQ_HZ          100000
 #define I2C_MASTER_TX_BUF_DISABLE   0
@@ -47,14 +47,14 @@ static int16_t read16(uint8_t reg) {
 }
 
 static float rawToG(int16_t raw) {
-    return raw / 16384.0f;
+    return raw / 8192.0f;
 }
 
 void imu_init() {
     i2c_master_init();
     
     writeRegister(CMD_REG, 0x11);
-    writeRegister(ACC_RANGE, 0x03);
+    writeRegister(ACC_RANGE, 0x05);
     vTaskDelay(100 / portTICK_PERIOD_MS);
     printf("BMI160 Started\n");
 }
