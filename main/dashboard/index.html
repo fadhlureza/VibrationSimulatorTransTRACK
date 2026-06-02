@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IMU Sensor Data</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Vibration Simulator</h1>
+    <div class="canvas-container">
+        <div class="graph-wrapper">
+            <h3>Pure (g)</h3>
+            <canvas id="pureGCanvas" width="800" height="150"></canvas>
+        </div>
+        <div class="graph-wrapper">
+            <h3>Calibrated (g)</h3>
+            <canvas id="calibratedGCanvas" width="800" height="150"></canvas>
+        </div>
+        <div class="graph-wrapper">
+            <h3>Calibrated (m/s&sup2;)</h3>
+            <canvas id="calibratedMs2Canvas" width="800" height="150"></canvas>
+        </div>
+        <div class="graph-wrapper">
+            <h3>Output Combined</h3>
+            <canvas id="combinedCanvas" width="800" height="150"></canvas>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
