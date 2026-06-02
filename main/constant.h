@@ -41,6 +41,10 @@ extern float g_vibration_g;
 extern float g_calibrated_g;
 extern float g_calibrated_ms2;
 
+// Shared Potentiometer data
+extern volatile int g_pot_raw;
+extern volatile int g_pwm_value;
+
 #ifdef __cplusplus
 }
 #endif

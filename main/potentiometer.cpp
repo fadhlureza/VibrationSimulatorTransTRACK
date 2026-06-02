@@ -23,6 +23,9 @@ int pot_read_pwm() {
     
     int pwmValue = (potValue * 255) / 4095;
     if(pwmValue > 255) pwmValue = 255;
+
+    g_pot_raw = potValue;
+    g_pwm_value = pwmValue;
     
     return pwmValue;
 }

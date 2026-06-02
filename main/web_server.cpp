@@ -19,7 +19,7 @@ static esp_err_t index_html_handler(httpd_req_t *req)
 static esp_err_t data_handler(httpd_req_t *req)
 {
     char resp_str[200];
-    snprintf(resp_str, sizeof(resp_str), "{\"vibration_g\": %.3f, \"calibrated_g\": %.3f, \"calibrated_ms2\": %.3f}", g_vibration_g, g_calibrated_g, g_calibrated_ms2);
+    snprintf(resp_str, sizeof(resp_str), "{\"vibration_g\": %.3f, \"calibrated_g\": %.3f, \"calibrated_ms2\": %.3f, \"pot_raw\": %d, \"pwm_value\": %d}", g_vibration_g, g_calibrated_g, g_calibrated_ms2, g_pot_raw, g_pwm_value);
             
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);

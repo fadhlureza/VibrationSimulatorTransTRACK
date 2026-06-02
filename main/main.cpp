@@ -7,6 +7,8 @@
 float g_vibration_g = 0.0f;
 float g_calibrated_g = 0.0f;
 float g_calibrated_ms2 = 0.0f;
+volatile int g_pot_raw = 0;
+volatile int g_pwm_value = 0;
 
 extern "C" void app_main(void) {
 
