@@ -1,4 +1,4 @@
-#include "potentiometer.h"
+#include "constant.h"
 #include "esp_adc/adc_oneshot.h"
 
 #define POT_ADC_UNIT    ADC_UNIT_1
@@ -21,8 +21,8 @@ int pot_read_pwm() {
     int potValue = 0;
     adc_oneshot_read(adc1_handle, POT_ADC_CHANNEL, &potValue);
     
-    int pwmValue = (potValue * 180) / 4095;
-    if(pwmValue > 180) pwmValue = 180;
+    int pwmValue = (potValue * 255) / 4095;
+    if(pwmValue > 255) pwmValue = 255;
     
     return pwmValue;
 }

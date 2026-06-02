@@ -1,4 +1,4 @@
-#include "imu.h"
+#include "constant.h"
 #include <stdio.h>
 #include <math.h>
 #include "freertos/FreeRTOS.h"
@@ -8,6 +8,7 @@
 #define BMI160_ADDR 0x68
 #define CMD_REG    0x7E
 #define ACC_X_LSB  0x12
+#define ACC_RANGE 0x41
 
 #define I2C_MASTER_SCL_IO           41
 #define I2C_MASTER_SDA_IO           40
@@ -53,6 +54,7 @@ void imu_init() {
     i2c_master_init();
     
     writeRegister(CMD_REG, 0x11);
+    writeRegister(ACC_RANGE, 0x03);
     vTaskDelay(100 / portTICK_PERIOD_MS);
     printf("BMI160 Started\n");
 }
@@ -87,7 +89,7 @@ void imu_calibrate() {
     printf("baseX: %.3f g | baseY: %.3f g | baseZ: %.3f g\n", baseX, baseY, baseZ);
 }
 
-void imu_read_data(float* vibration, float* vibration_ms2, float* deltaX, float* deltaY, float* deltaZ, 
+void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_calibrated, float* deltaX, float* deltaY, float* deltaZ, 
                    float* accX_ms2, float* accY_ms2, float* accZ_ms2, 
                    float* pitch, float* roll) {
     int16_t accX_raw = read16(ACC_X_LSB);
@@ -103,7 +105,8 @@ void imu_read_data(float* vibration, float* vibration_ms2, float* deltaX, float*
     *deltaZ = accZ_g - baseZ;
 
     *vibration = sqrt((*deltaX) * (*deltaX) + (*deltaY) * (*deltaY) + (*deltaZ) * (*deltaZ));
-    *vibration_ms2 = (*vibration) * 9.80665;
+    *vibration_ms2 = ((*vibration) * 9.80665);
+    *vibration_ms2_calibrated = ((*vibration_ms2) * 1.226) + 0.145;
 
     *roll = atan2(accY_g, accZ_g) * 180.0 / M_PI;
     *pitch = atan2(-accX_g, sqrt(accY_g * accY_g + accZ_g * accZ_g)) * 180.0 / M_PI;

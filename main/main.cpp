@@ -2,10 +2,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#include "imu.h"
-#include "motor.h"
-#include "button.h"
-#include "potentiometer.h"
+#include "constant.h"
 
 extern "C" void app_main(void) {
 
@@ -24,12 +21,13 @@ extern "C" void app_main(void) {
 
     bool motorRunning = false;
     bool motorForwardDirection = true;
+    int counter = 1;
 
     while (1) {
-        float vibration, vibration_ms2, deltaX, deltaY, deltaZ;
+        float vibration, vibration_ms2, vibration_ms2_calibrated, deltaX, deltaY, deltaZ;
         float accX_ms2, accY_ms2, accZ_ms2, pitch, roll;
         
-        imu_read_data(&vibration, &vibration_ms2, &deltaX, &deltaY, &deltaZ, 
+        imu_read_data(&vibration, &vibration_ms2, &vibration_ms2_calibrated, &deltaX, &deltaY, &deltaZ, 
                       &accX_ms2, &accY_ms2, &accZ_ms2, &pitch, &roll);
 
         int pwmValue = pot_read_pwm();
@@ -75,8 +73,10 @@ extern "C" void app_main(void) {
         } else {
             printf("DIAM    | ");
         }
+        
+        printf("counter: %d | ", counter++);
 
-        printf("vibration: %.3f g (%.3f m/s2) | dX: %.3f | dY: %.3f | dZ: %.3f\n", vibration, vibration_ms2, deltaX, deltaY, deltaZ);
+        printf("vibration: %.3f g (%.3f m/s2) | calibrated vibration: %.3f m/s2 | dX: %.3f | dY: %.3f | dZ: %.3f\n", vibration, vibration_ms2, vibration_ms2_calibrated, deltaX, deltaY, deltaZ);
         
         printf("Data Accelerometer m/s², pitch, and roll!!\n");
         printf("Acc X: %.2f m/s2 | Y: %.2f m/s2 | Z: %.2f m/s2 || Pitch: %.2f deg | Roll: %.2f deg\n", 
