@@ -13,11 +13,11 @@ float baseZ = 0;
 #define R_EN_PIN  11
 #define L_EN_PIN  12
 
-#define POT_PIN   4
+#define POT_PIN   1
 
-#define START_BTN_PIN  35
-#define STOP_BTN_PIN   36
-#define DIR_BTN_PIN    37
+#define START_BTN_PIN  8
+#define STOP_BTN_PIN   3
+#define DIR_BTN_PIN    46
 
 #define PWM_FREQ  1000
 #define PWM_RES   8
@@ -99,7 +99,7 @@ void motorReverse(int speedPWM) {
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin(40, 41);
+  Wire.begin(5, 4);
 
   writeRegister(CMD_REG, 0x11);
   delay(100);

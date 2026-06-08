@@ -3,25 +3,42 @@
 <head>
     <title>IMU Sensor Data</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:,">
 </head>
 <body>
     <h1>Vibration Simulator</h1>
     <div class="canvas-container">
         <div class="graph-wrapper">
-            <h3>Pure (g)</h3>
+            <h3>Pure (g) <span id="val-pure" style="color: blue;">[ 0.00 ]</span></h3>
             <canvas id="pureGCanvas" width="800" height="150"></canvas>
         </div>
         <div class="graph-wrapper">
-            <h3>Calibrated (g)</h3>
+            <h3>Calibrated (g) <span id="val-calG" style="color: green;">[ 0.00 ]</span></h3>
             <canvas id="calibratedGCanvas" width="800" height="150"></canvas>
         </div>
         <div class="graph-wrapper">
-            <h3>Calibrated (m/s&sup2;)</h3>
+            <h3>Calibrated (m/s&sup2;) <span id="val-calMs2" style="color: red;">[ 0.00 ]</span></h3>
             <canvas id="calibratedMs2Canvas" width="800" height="150"></canvas>
         </div>
         <div class="graph-wrapper">
-            <h3>Output Combined</h3>
+            <h3>Output Combined 
+                <span style="font-size: 14px; font-weight: normal; margin-left: 10px;">
+                    ( Pot: <span id="val-pot" style="color: #FF9800; font-weight: bold;">0</span> | 
+                    PWM: <span id="val-pwm" style="color: #9C27B0; font-weight: bold;">0</span> | 
+                    m/s&sup2;: <span id="val-combMs2" style="color: red; font-weight: bold;">0.00</span> )
+                </span>
+            </h3>
             <canvas id="combinedCanvas" width="800" height="150"></canvas>
+        </div>
+        <div class="graph-wrapper">
+            <h3>History 1 Jam
+                <span style="font-size: 14px; font-weight: normal; margin-left: 10px;">
+                    ( Pot: <span id="val-histPot" style="color: #FF9800; font-weight: bold;">0</span> | 
+                    PWM: <span id="val-histPwm" style="color: #9C27B0; font-weight: bold;">0</span> | 
+                    m/s&sup2;: <span id="val-histMs2" style="color: red; font-weight: bold;">0.00</span> )
+                </span>
+            </h3>
+            <canvas id="historyCanvas" width="800" height="150"></canvas>
         </div>
     </div>
 

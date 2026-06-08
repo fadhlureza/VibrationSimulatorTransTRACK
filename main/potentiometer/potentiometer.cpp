@@ -18,8 +18,8 @@ int pot_read_pwm() {
     int potValue = 0;
     adc_oneshot_read(adc1_handle, POT_ADC_CHANNEL, &potValue);
     
-    int pwmValue = (potValue * 255) / 4095;
-    if(pwmValue > 255) pwmValue = 255;
+    int pwmValue = (potValue * 210) / 4095;
+    if(pwmValue > 210) pwmValue = 210;
 
     g_pot_raw = potValue;
     g_pwm_value = pwmValue;

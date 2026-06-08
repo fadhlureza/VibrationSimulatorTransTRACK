@@ -8,9 +8,9 @@ extern volatile bool stop_btn_flag;
 extern volatile bool dir_btn_flag;
 
 // Button GPIO pins
-#define START_BTN_PIN  GPIO_NUM_35
-#define STOP_BTN_PIN   GPIO_NUM_36
-#define DIR_BTN_PIN    GPIO_NUM_37
+#define START_BTN_PIN  GPIO_NUM_8
+#define STOP_BTN_PIN   GPIO_NUM_3
+#define DIR_BTN_PIN    GPIO_NUM_46
 
 //Motor GPIO pins
 #define RPWM_PIN  13
@@ -28,7 +28,7 @@ extern volatile bool dir_btn_flag;
 
 // Potentiometer ADC parameters
 #define POT_ADC_UNIT    ADC_UNIT_1
-#define POT_ADC_CHANNEL ADC_CHANNEL_3
+#define POT_ADC_CHANNEL ADC_CHANNEL_0
 
 // IMU parameters
 #define BMI160_ADDR 0x68
@@ -37,8 +37,8 @@ extern volatile bool dir_btn_flag;
 #define ACC_RANGE 0x41
 
 // I2C parameters
-#define I2C_MASTER_SCL_IO           41
-#define I2C_MASTER_SDA_IO           42
+#define I2C_MASTER_SCL_IO           4
+#define I2C_MASTER_SDA_IO           5
 #define I2C_MASTER_NUM              I2C_NUM_0
 #define I2C_MASTER_FREQ_HZ          100000
 #define I2C_MASTER_TX_BUF_DISABLE   0
