@@ -1,43 +1,40 @@
 #include "constant.h"
 #include "button.h"
 #include "esp_attr.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "driver/gpio.h"
-#include "esp_timer.h"
 
 volatile bool start_btn_flag = false;
 volatile bool stop_btn_flag = false;
 volatile bool dir_btn_flag = false;
 
-volatile int64_t last_isr_time = 0;
+static void button_task(void *pvParameters) {
+    int start_cnt = 0;
+    int stop_cnt = 0;
+    int dir_cnt = 0;
 
-static void IRAM_ATTR gpio_isr_handler(void* arg) {
-    uint32_t gpio_num = (uint32_t)(uintptr_t) arg;
-    int64_t current_time = esp_timer_get_time();
-    
-    if (current_time - last_isr_time > 250000) {
-        if (gpio_num == START_BTN_PIN) {
-            start_btn_flag = true;
-        } else if (gpio_num == STOP_BTN_PIN) {
-            stop_btn_flag = true;
-        } else if (gpio_num == DIR_BTN_PIN) {
-            dir_btn_flag = true;
-        }
-        last_isr_time = current_time;
+    while (1) {
+        if (gpio_get_level((gpio_num_t)START_BTN_PIN) == 0) start_cnt++; else start_cnt = 0;
+        if (gpio_get_level((gpio_num_t)STOP_BTN_PIN) == 0) stop_cnt++; else stop_cnt = 0;
+        if (gpio_get_level((gpio_num_t)DIR_BTN_PIN) == 0) dir_cnt++; else dir_cnt = 0;
+
+        if (start_cnt == 20) { start_btn_flag = true; start_cnt = 31; }
+        if (stop_cnt == 20) { stop_btn_flag = true; stop_cnt = 31; }
+        if (dir_cnt == 20) { dir_btn_flag = true; dir_cnt = 31; }
+
+        vTaskDelay(pdMS_TO_TICKS(100)); 
     }
 }
 
 void button_init() {
     gpio_config_t io_conf = {};
-    io_conf.intr_type = GPIO_INTR_NEGEDGE;
+    io_conf.intr_type = GPIO_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_INPUT;
     io_conf.pin_bit_mask = (1ULL << START_BTN_PIN) | (1ULL << STOP_BTN_PIN) | (1ULL << DIR_BTN_PIN);
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
     gpio_config(&io_conf);
 
-    gpio_install_isr_service(0);
-    
-    gpio_isr_handler_add((gpio_num_t)START_BTN_PIN, gpio_isr_handler, (void*) START_BTN_PIN);
-    gpio_isr_handler_add((gpio_num_t)STOP_BTN_PIN, gpio_isr_handler, (void*) STOP_BTN_PIN);
-    gpio_isr_handler_add((gpio_num_t)DIR_BTN_PIN, gpio_isr_handler, (void*) DIR_BTN_PIN);
+    xTaskCreatePinnedToCore(button_task, "button_task", 2048, NULL, 5, NULL, 1);
 }
