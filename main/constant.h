@@ -35,6 +35,7 @@ extern volatile bool dir_btn_flag;
 #define CMD_REG    0x7E
 #define ACC_X_LSB  0x12
 #define ACC_RANGE 0x41
+#define FFT_SAMPLES 128
 
 // I2C parameters
 #define I2C_MASTER_SCL_IO           4
@@ -59,6 +60,7 @@ void start_webserver(void);
 extern float g_vibration_g;
 extern float g_calibrated_g;
 extern float g_calibrated_ms2;
+extern volatile float g_dominant_freq_hz;
 
 // Shared Potentiometer data
 extern volatile int g_pot_raw;

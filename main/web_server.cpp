@@ -39,7 +39,7 @@ static esp_err_t script_js_handler(httpd_req_t *req)
 static esp_err_t data_handler(httpd_req_t *req)
 {
     char resp_str[256];
-    snprintf(resp_str, sizeof(resp_str), "{\"vibration_g\": %.3f, \"calibrated_g\": %.3f, \"calibrated_ms2\": %.3f, \"pot_raw\": %d, \"pwm_value\": %d}", g_vibration_g, g_calibrated_g, g_calibrated_ms2, g_pot_raw, g_pwm_value);
+    snprintf(resp_str, sizeof(resp_str), "{\"vibration_g\": %.3f, \"calibrated_g\": %.3f, \"calibrated_ms2\": %.3f, \"dominant_freq_hz\": %.2f, \"pot_raw\": %d, \"pwm_value\": %d}", g_vibration_g, g_calibrated_g, g_calibrated_ms2, g_dominant_freq_hz, g_pot_raw, g_pwm_value);
             
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
@@ -77,6 +77,7 @@ static const httpd_uri_t uri_data = {
 void start_webserver(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.stack_size = 8192;
     
     httpd_handle_t server = NULL;
 

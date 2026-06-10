@@ -5,10 +5,63 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/i2c.h"
+#include "esp_timer.h"
 
 static float baseX = 0;
 static float baseY = 0;
 static float baseZ = 0;
+
+static float vReal[FFT_SAMPLES];
+static float vImag[FFT_SAMPLES];
+static int sampleIndex = 0;
+static int64_t first_sample_time = 0;
+static float dominant_freq_hz = 0.0;
+
+static void compute_FFT(float *vR, float *vI, uint16_t samples) {
+    uint16_t j = 0;
+    for (uint16_t i = 0; i < (samples - 1); i++) {
+        if (i < j) {
+            float tempR = vR[j];
+            float tempI = vI[j];
+            vR[j] = vR[i];
+            vI[j] = vI[i];
+            vR[i] = tempR;
+            vI[i] = tempI;
+        }
+        uint16_t k = (samples >> 1);
+        while (k <= j) {
+            j -= k;
+            k >>= 1;
+        }
+        j += k;
+    }
+
+    float c1 = -1.0, c2 = 0.0;
+    uint16_t l2 = 1;
+    for (uint16_t l = 0; (1 << l) < samples; l++) {
+        uint16_t l1 = l2;
+        l2 <<= 1;
+        float u1 = 1.0;
+        float u2 = 0.0;
+        for (uint16_t j = 0; j < l1; j++) {
+            for (uint16_t i = j; i < samples; i += l2) {
+                uint16_t i1 = i + l1;
+                float t1 = u1 * vR[i1] - u2 * vI[i1];
+                float t2 = u1 * vI[i1] + u2 * vR[i1];
+                vR[i1] = vR[i] - t1;
+                vI[i1] = vI[i] - t2;
+                vR[i] += t1;
+                vI[i] += t2;
+            }
+            float z = (u1 * c1) - (u2 * c2);
+            u2 = (u1 * c2) + (u2 * c1);
+            u1 = z;
+        }
+        c2 = sqrt((1.0 - c1) / 2.0);
+        if (l == 0) c2 = -c2;
+        c1 = sqrt((1.0 + c1) / 2.0);
+    }
+}
 
 static esp_err_t i2c_master_init(void) {
     i2c_config_t conf = {};
@@ -79,7 +132,7 @@ void imu_calibrate() {
 
 void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_calibrated, float* deltaX, float* deltaY, float* deltaZ, 
                    float* accX_ms2, float* accY_ms2, float* accZ_ms2, 
-                   float* pitch, float* roll) {
+                   float* pitch, float* roll, float* output_freq_hz) {
     int16_t accX_raw = read16(ACC_X_LSB);
     int16_t accY_raw = read16(ACC_X_LSB + 2);
     int16_t accZ_raw = read16(ACC_X_LSB + 4);
@@ -102,4 +155,38 @@ void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_
     *accX_ms2 = accX_g * 9.80665;
     *accY_ms2 = accY_g * 9.80665;
     *accZ_ms2 = accZ_g * 9.80665;
+
+    if (sampleIndex == 0) {
+        first_sample_time = esp_timer_get_time();
+    }
+
+    vReal[sampleIndex] = *vibration_ms2_calibrated;
+    vImag[sampleIndex] = 0.0;
+    sampleIndex++;
+
+    if (sampleIndex >= FFT_SAMPLES) {
+        int64_t end_time = esp_timer_get_time();
+        
+        float time_elapsed_sec = (end_time - first_sample_time) / 1000000.0;
+        float sampling_freq = FFT_SAMPLES / time_elapsed_sec;
+
+        compute_FFT(vReal, vImag, FFT_SAMPLES);
+
+        float max_magnitude = 0.0;
+        int peak_index = 0;
+        
+        for (int i = 1; i < (FFT_SAMPLES / 2); i++) { 
+            float magnitude = sqrt((vReal[i] * vReal[i]) + (vImag[i] * vImag[i]));
+            if (magnitude > max_magnitude) {
+                max_magnitude = magnitude;
+                peak_index = i;
+            }
+        }
+
+        dominant_freq_hz = (peak_index * sampling_freq) / FFT_SAMPLES;
+        
+        sampleIndex = 0; 
+    }
+
+    *output_freq_hz = dominant_freq_hz;
 }

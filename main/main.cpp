@@ -11,6 +11,7 @@
 float g_vibration_g = 0.0f;
 float g_calibrated_g = 0.0f;
 float g_calibrated_ms2 = 0.0f;
+volatile float g_dominant_freq_hz = 0.0;
 volatile int g_pot_raw = 0;
 volatile int g_pwm_value = 0;
 
@@ -37,15 +38,16 @@ extern "C" void app_main(void) {
     int counter = 1;
 
     while (1) {
-        float vibration, vibration_ms2, vibration_ms2_calibrated, deltaX, deltaY, deltaZ;
+        float vibration, vibration_ms2, vibration_ms2_calibrated, deltaX, deltaY, deltaZ, freq_hz;
         float accX_ms2, accY_ms2, accZ_ms2, pitch, roll;
         
         imu_read_data(&vibration, &vibration_ms2, &vibration_ms2_calibrated, &deltaX, &deltaY, &deltaZ, 
-                      &accX_ms2, &accY_ms2, &accZ_ms2, &pitch, &roll);
+                      &accX_ms2, &accY_ms2, &accZ_ms2, &pitch, &roll, &freq_hz);
 
         g_vibration_g = vibration;
         g_calibrated_ms2 = vibration_ms2_calibrated;
         g_calibrated_g = vibration_ms2_calibrated / 9.80665f;
+        g_dominant_freq_hz = freq_hz;
 
         int pwmValue = pot_read_pwm();
 
@@ -93,7 +95,7 @@ extern "C" void app_main(void) {
         
         printf("counter: %d | ", counter++);
 
-        printf("vibration: %.3f g (%.3f m/s2) | calibrated vibration: %.3f m/s2 | dX: %.3f | dY: %.3f | dZ: %.3f\n", vibration, vibration_ms2, vibration_ms2_calibrated, deltaX, deltaY, deltaZ);
+        printf("vibration: %.3f g (%.3f m/s2) | calibrated vibration: %.3f m/s2 | dominant frequency: %.2f Hz | dX: %.3f | dY: %.3f | dZ: %.3f\n", vibration, vibration_ms2, vibration_ms2_calibrated, freq_hz, deltaX, deltaY, deltaZ);
         
         printf("Data Accelerometer m/s², pitch, and roll!!\n");
         printf("Acc X: %.2f m/s2 | Y: %.2f m/s2 | Z: %.2f m/s2 || Pitch: %.2f deg | Roll: %.2f deg\n", 

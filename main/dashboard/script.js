@@ -12,6 +12,7 @@ const graphs = {
     pureG: setupCanvas("pureGCanvas"),
     calG: setupCanvas("calibratedGCanvas"),
     calMs2: setupCanvas("calibratedMs2Canvas"),
+    freq: setupCanvas("freqCanvas"),
     combined: {
         canvas: document.getElementById("combinedCanvas"),
         ctx: document.getElementById("combinedCanvas").getContext("2d"),
@@ -169,6 +170,7 @@ async function fetchData() {
         updateData(graphs.pureG, json.vibration_g);
         updateData(graphs.calG, json.calibrated_g);
         updateData(graphs.calMs2, json.calibrated_ms2);
+        updateData(graphs.freq, json.dominant_freq_hz);
 
         graphs.combined.dataPot.push(json.pot_raw || 0);
         graphs.combined.dataPot.shift();
@@ -182,6 +184,7 @@ async function fetchData() {
         drawGraph(graphs.pureG, "g", "blue", 4);
         drawGraph(graphs.calG, "g", "green", 4);
         drawGraph(graphs.calMs2, "m/s2", "red", 40);
+        drawGraph(graphs.freq, "Hz", "purple", 100);
         drawCombinedGraph();
 
         fetchCounter++;
@@ -198,6 +201,7 @@ async function fetchData() {
             document.getElementById('val-histPot').innerText = json.pot_raw;
             document.getElementById('val-histPwm').innerText = json.pwm_value;
             document.getElementById('val-histMs2').innerText = json.calibrated_ms2.toFixed(3);
+            document.getElementById('val-freq').innerText = json.dominant_freq_hz.toFixed(2);
 
             drawHistoryGraph();
             
@@ -214,6 +218,8 @@ async function fetchData() {
 drawGraph(graphs.pureG, "g", "blue", 4);
 drawGraph(graphs.calG, "g", "green", 4);
 drawGraph(graphs.calMs2, "m/s2", "red", 40);
+drawGraph(graphs.freq, "Hz", "purple", 100);
+
 drawCombinedGraph();
 
 fetchData();
