@@ -22,7 +22,10 @@ extern "C" void app_main(void) {
     wifi_init_softap();
     start_webserver();
 
-    imu_init();
+    if (!imu_init()) {
+        printf("IMU init failed - check wiring/I2C\n");
+        return;
+    }
     imu_calibrate();
     
     motor_init();

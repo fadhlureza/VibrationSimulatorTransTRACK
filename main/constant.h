@@ -31,11 +31,16 @@ extern volatile bool dir_btn_flag;
 #define POT_ADC_CHANNEL ADC_CHANNEL_0
 
 // IMU parameters
-#define BMI160_ADDR 0x68
-#define CMD_REG    0x7E
-#define ACC_X_LSB  0x12
-#define ACC_RANGE 0x41
-#define FFT_SAMPLES 128
+#define BMI160_ADDR             0x68
+#define BMI160_REG_CHIP_ID      0x00
+#define BMI160_CHIP_ID          0xD1
+#define BMI160_REG_STATUS       0x1B
+#define BMI160_STATUS_DRDY_ACC  0x80
+#define CMD_REG                 0x7E
+#define BMI160_CMD_SOFT_RESET   0xB6
+#define ACC_X_LSB               0x12
+#define ACC_RANGE               0x41
+#define FFT_SAMPLES             128
 
 // I2C parameters
 #define I2C_MASTER_SCL_IO           4
