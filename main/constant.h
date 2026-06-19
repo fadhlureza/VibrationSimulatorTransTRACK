@@ -34,8 +34,9 @@ extern volatile bool dir_btn_flag;
 #define BMI160_ADDR 0x68
 #define CMD_REG    0x7E
 #define ACC_X_LSB  0x12
+#define ACC_CONF   0x40
 #define ACC_RANGE 0x41
-#define FFT_SAMPLES 128
+#define FFT_SAMPLES 512
 
 // I2C parameters
 #define I2C_MASTER_SCL_IO           4

@@ -88,14 +88,15 @@ static int16_t read16(uint8_t reg) {
 }
 
 static float rawToG(int16_t raw) {
-    return raw / 8192.0f;
+    return raw / 2048.0f;
 }
 
 void imu_init() {
     i2c_master_init();
     
     writeRegister(CMD_REG, 0x11);
-    writeRegister(ACC_RANGE, 0x05);
+    writeRegister(ACC_CONF, 0x2C);
+    writeRegister(ACC_RANGE, 0x0C);
     vTaskDelay(100 / portTICK_PERIOD_MS);
     printf("BMI160 Started\n");
 }
@@ -132,7 +133,7 @@ void imu_calibrate() {
 
 void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_calibrated, float* deltaX, float* deltaY, float* deltaZ, 
                    float* accX_ms2, float* accY_ms2, float* accZ_ms2, 
-                   float* pitch, float* roll, float* output_freq_hz) {
+                   float* pitch, float* roll, float* output_freq_hz, float* accZ_ms2_calibrated) {
     int16_t accX_raw = read16(ACC_X_LSB);
     int16_t accY_raw = read16(ACC_X_LSB + 2);
     int16_t accZ_raw = read16(ACC_X_LSB + 4);
@@ -149,6 +150,8 @@ void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_
     *vibration_ms2 = ((*vibration) * 9.80665);
     *vibration_ms2_calibrated = ((*vibration_ms2) * 1.226) + 0.145;
 
+    *accZ_ms2_calibrated = (*deltaZ * 9.80665) * 1.226;
+
     *roll = atan2(accY_g, accZ_g) * 180.0 / M_PI;
     *pitch = atan2(-accX_g, sqrt(accY_g * accY_g + accZ_g * accZ_g)) * 180.0 / M_PI;
 
@@ -160,7 +163,7 @@ void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_
         first_sample_time = esp_timer_get_time();
     }
 
-    vReal[sampleIndex] = *vibration_ms2_calibrated;
+    vReal[sampleIndex] = *accZ_ms2_calibrated;
     vImag[sampleIndex] = 0.0;
     sampleIndex++;
 
@@ -175,7 +178,7 @@ void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_
         float max_magnitude = 0.0;
         int peak_index = 0;
         
-        for (int i = 1; i < (FFT_SAMPLES / 2); i++) { 
+        for (int i = 3; i < (FFT_SAMPLES / 2); i++) { 
             float magnitude = sqrt((vReal[i] * vReal[i]) + (vImag[i] * vImag[i]));
             if (magnitude > max_magnitude) {
                 max_magnitude = magnitude;

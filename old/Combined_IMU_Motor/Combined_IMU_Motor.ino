@@ -99,7 +99,7 @@ void motorReverse(int speedPWM) {
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin(5, 4);
+  Wire.begin(4, 5);
 
   writeRegister(CMD_REG, 0x11);
   delay(100);
