@@ -40,6 +40,7 @@ extern volatile bool dir_btn_flag;
 #define BMI160_CMD_SOFT_RESET   0xB6
 #define ACC_X_LSB               0x12
 #define ACC_RANGE               0x41
+#define ACC_CONF                0x40
 #define FFT_SAMPLES             128
 
 // I2C parameters

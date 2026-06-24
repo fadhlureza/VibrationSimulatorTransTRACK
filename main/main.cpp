@@ -42,10 +42,10 @@ extern "C" void app_main(void) {
 
     while (1) {
         float vibration, vibration_ms2, vibration_ms2_calibrated, deltaX, deltaY, deltaZ, freq_hz;
-        float accX_ms2, accY_ms2, accZ_ms2, pitch, roll;
+        float accX_ms2, accY_ms2, accZ_ms2, accZ_ms2_calibrated, pitch, roll;
         
         imu_read_data(&vibration, &vibration_ms2, &vibration_ms2_calibrated, &deltaX, &deltaY, &deltaZ, 
-                      &accX_ms2, &accY_ms2, &accZ_ms2, &pitch, &roll, &freq_hz);
+                      &accX_ms2, &accY_ms2, &accZ_ms2, &pitch, &roll, &freq_hz, &accZ_ms2_calibrated);
 
         g_vibration_g = vibration;
         g_calibrated_ms2 = vibration_ms2_calibrated;

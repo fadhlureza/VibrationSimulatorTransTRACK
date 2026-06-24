@@ -108,7 +108,7 @@ function drawCombinedGraph() {
 
     drawLine(dataPot, "#FF9800", 4095); // Potensio (Max 4095)
     drawLine(dataPwm, "#9C27B0", 210);  // PWM (Max 210)
-    drawLine(dataMs2, "red", 40);       // m/s2 (Max 40)
+    drawLine(dataMs2, "red", 160);       // m/s2 (Max 40)
 }
 
 function drawHistoryGraph() {
@@ -146,7 +146,7 @@ function drawHistoryGraph() {
 
     drawLine(dataPot, "#FF9800", 4095); // Potensio
     drawLine(dataPwm, "#9C27B0", 210);  // PWM
-    drawLine(dataMs2, "red", 40);       // m/s2
+    drawLine(dataMs2, "red", 160);       // m/s2
 }
 
 function updateData(graph, newValue) {
@@ -181,9 +181,9 @@ async function fetchData() {
         graphs.combined.dataMs2.push(json.calibrated_ms2 || 0);
         graphs.combined.dataMs2.shift();
 
-        drawGraph(graphs.pureG, "g", "blue", 4);
-        drawGraph(graphs.calG, "g", "green", 4);
-        drawGraph(graphs.calMs2, "m/s2", "red", 40);
+        drawGraph(graphs.pureG, "g", "blue", 16);
+        drawGraph(graphs.calG, "g", "green", 16);
+        drawGraph(graphs.calMs2, "m/s2", "red", 160);
         drawGraph(graphs.freq, "Hz", "purple", 100);
         drawCombinedGraph();
 
@@ -215,9 +215,9 @@ async function fetchData() {
     setTimeout(fetchData, 100);
 }
 
-drawGraph(graphs.pureG, "g", "blue", 4);
-drawGraph(graphs.calG, "g", "green", 4);
-drawGraph(graphs.calMs2, "m/s2", "red", 40);
+drawGraph(graphs.pureG, "g", "blue", 16);
+drawGraph(graphs.calG, "g", "green", 16);
+drawGraph(graphs.calMs2, "m/s2", "red", 160);
 drawGraph(graphs.freq, "Hz", "purple", 100);
 
 drawCombinedGraph();

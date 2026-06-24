@@ -29,7 +29,7 @@ static struct {
     float accX_g, accY_g, accZ_g;
     float vibration, vibration_ms2, vibration_ms2_calibrated;
     float deltaX, deltaY, deltaZ;
-    float accX_ms2, accY_ms2, accZ_ms2;
+    float accX_ms2, accY_ms2, accZ_ms2, accZ_ms2_calibrated;
     float pitch, roll;
     bool valid;
 } last_valid = {};
@@ -141,7 +141,7 @@ static esp_err_t read_accel_burst(int16_t *x, int16_t *y, int16_t *z) {
 }
 
 static float rawToG(int16_t raw) {
-    return raw / 8192.0f;
+    return raw / 2048.0f;
 }
 
 static esp_err_t bmi160_check_who_am_i(void) {
@@ -158,12 +158,18 @@ static esp_err_t bmi160_check_who_am_i(void) {
 }
 
 static esp_err_t bmi160_configure(void) {
+
     esp_err_t err = writeRegister(CMD_REG, 0x11);
     if (err != ESP_OK) {
         return err;
     }
 
-    err = writeRegister(ACC_RANGE, 0x05);
+    err = writeRegister(ACC_CONF, 0x2C);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = writeRegister(ACC_RANGE, 0x0C);
     if (err != ESP_OK) {
         return err;
     }
@@ -188,7 +194,7 @@ static void copy_last_valid_outputs(
     float *vibration, float *vibration_ms2, float *vibration_ms2_calibrated,
     float *deltaX, float *deltaY, float *deltaZ,
     float *accX_ms2, float *accY_ms2, float *accZ_ms2,
-    float *pitch, float *roll, float *output_freq_hz) {
+    float *pitch, float *roll, float *output_freq_hz, float *accZ_ms2_calibrated) {
     *vibration = last_valid.vibration;
     *vibration_ms2 = last_valid.vibration_ms2;
     *vibration_ms2_calibrated = last_valid.vibration_ms2_calibrated;
@@ -201,14 +207,15 @@ static void copy_last_valid_outputs(
     *pitch = last_valid.pitch;
     *roll = last_valid.roll;
     *output_freq_hz = dominant_freq_hz;
+    *accZ_ms2_calibrated = last_valid.accZ_ms2_calibrated;
 }
 
-static void update_fft(float vibration_ms2_calibrated) {
+static void update_fft(float accZ_ms2_calibrated) {
     if (sampleIndex == 0) {
         first_sample_time = esp_timer_get_time();
     }
 
-    vReal[sampleIndex] = vibration_ms2_calibrated;
+    vReal[sampleIndex] = accZ_ms2_calibrated;
     vImag[sampleIndex] = 0.0;
     sampleIndex++;
 
@@ -337,7 +344,7 @@ void imu_calibrate(void) {
 
 void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_calibrated, float* deltaX, float* deltaY, float* deltaZ,
                    float* accX_ms2, float* accY_ms2, float* accZ_ms2,
-                   float* pitch, float* roll, float* output_freq_hz) {
+                   float* pitch, float* roll, float* output_freq_hz, float* accZ_ms2_calibrated) {
     read_cycle_count++;
     if (read_cycle_count >= HEALTH_CHECK_INTERVAL) {
         read_cycle_count = 0;
@@ -363,7 +370,7 @@ void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_
                 vibration, vibration_ms2, vibration_ms2_calibrated,
                 deltaX, deltaY, deltaZ,
                 accX_ms2, accY_ms2, accZ_ms2,
-                pitch, roll, output_freq_hz);
+                pitch, roll, output_freq_hz, accZ_ms2_calibrated);
         } else {
             *output_freq_hz = dominant_freq_hz;
         }
@@ -383,6 +390,7 @@ void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_
     float out_vibration = sqrt(out_deltaX * out_deltaX + out_deltaY * out_deltaY + out_deltaZ * out_deltaZ);
     float out_vibration_ms2 = out_vibration * 9.80665f;
     float out_vibration_ms2_calibrated = (out_vibration_ms2 * 1.226f) + 0.145f;
+    float out_accZ_ms2_calibrated = (accZ_g * 9.80665f * 1.226f) + 0.145f;
 
     float out_roll = atan2(accY_g, accZ_g) * 180.0f / (float)M_PI;
     float out_pitch = atan2(-accX_g, sqrt(accY_g * accY_g + accZ_g * accZ_g)) * 180.0f / (float)M_PI;
@@ -403,6 +411,7 @@ void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_
     last_valid.accX_ms2 = out_accX_ms2;
     last_valid.accY_ms2 = out_accY_ms2;
     last_valid.accZ_ms2 = out_accZ_ms2;
+    last_valid.accZ_ms2_calibrated = out_accZ_ms2_calibrated;
     last_valid.pitch = out_pitch;
     last_valid.roll = out_roll;
     last_valid.valid = true;
@@ -421,4 +430,5 @@ void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_
 
     update_fft(out_vibration_ms2_calibrated);
     *output_freq_hz = dominant_freq_hz;
+    *accZ_ms2_calibrated = out_accZ_ms2_calibrated;
 }
