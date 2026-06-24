@@ -16,19 +16,35 @@ volatile float g_dominant_freq_hz = 0.0;
 volatile int g_pot_raw = 0;
 volatile int g_pwm_value = 0;
 
-float g_accX_ms2 = 0.0f;
-float g_accY_ms2 = 0.0f;
-float g_accZ_ms2 = 0.0f;
-float g_pitch = 0.0f;
-float g_roll = 0.0f;
-float g_deltaX = 0.0f;
-float g_deltaY = 0.0f;
-float g_deltaZ = 0.0f;
+extern "C" void app_main(void) {
+
+    printf("Initializing...\n");
+    
+    wifi_init_softap();
+    start_webserver();
+
+    if (!imu_init()) {
+        printf("IMU init failed - check wiring/I2C\n");
+        return;
+    }
+    imu_calibrate();
+    
+    motor_init();
+    motorStop();
+    
+    pot_init();
+    button_init();
+
+    printf("Motor Control Initialized.\n");
+
+    bool motorRunning = false;
+    bool motorForwardDirection = true;
+    int counter = 1;
 
 void sensor_read_task(void *pvParameters) {
     while (1) {
-        float vibration, vibration_ms2, vibration_ms2_calibrated, deltaX, deltaY, deltaZ, freq_hz, accZ_ms2_calibrated;
-        float accX_ms2, accY_ms2, accZ_ms2, pitch, roll;
+        float vibration, vibration_ms2, vibration_ms2_calibrated, deltaX, deltaY, deltaZ, freq_hz;
+        float accX_ms2, accY_ms2, accZ_ms2, accZ_ms2_calibrated, pitch, roll;
         
         imu_read_data(&vibration, &vibration_ms2, &vibration_ms2_calibrated, &deltaX, &deltaY, &deltaZ, 
                       &accX_ms2, &accY_ms2, &accZ_ms2, &pitch, &roll, &freq_hz, &accZ_ms2_calibrated);
