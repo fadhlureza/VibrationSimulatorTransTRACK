@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_timer.h"
 
 #include "constant.h"
 #include "imu/imu.h"
@@ -40,6 +41,7 @@ extern "C" void app_main(void) {
     bool motorForwardDirection = true;
     int counter = 1;
 
+void sensor_read_task(void *pvParameters) {
     while (1) {
         float vibration, vibration_ms2, vibration_ms2_calibrated, deltaX, deltaY, deltaZ, freq_hz;
         float accX_ms2, accY_ms2, accZ_ms2, accZ_ms2_calibrated, pitch, roll;
@@ -51,8 +53,28 @@ extern "C" void app_main(void) {
         g_calibrated_ms2 = vibration_ms2_calibrated;
         g_calibrated_g = vibration_ms2_calibrated / 9.80665f;
         g_dominant_freq_hz = freq_hz;
+        
+        g_deltaX = deltaX;
+        g_deltaY = deltaY;
+        g_deltaZ = deltaZ;
+        g_accX_ms2 = accX_ms2;
+        g_accY_ms2 = accY_ms2;
+        g_accZ_ms2 = accZ_ms2;
+        g_pitch = pitch;
+        g_roll = roll;
 
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+void control_and_print_task(void *pvParameters) {
+    bool motorRunning = false;
+    bool motorForwardDirection = true;
+    int counter = 1;
+
+    while (1) {
         int pwmValue = pot_read_pwm();
+        g_pwm_value = pwmValue;
 
         if (start_btn_flag) {
             start_btn_flag = false;
@@ -90,7 +112,7 @@ extern "C" void app_main(void) {
         }
 
         printf("Data Accelerometer BaseLine!!\n");
-        if (vibration >= 0.03) {
+        if (g_vibration_g >= 0.03) {
             printf("GETARAN | ");
         } else {
             printf("DIAM    | ");
@@ -98,15 +120,37 @@ extern "C" void app_main(void) {
         
         printf("counter: %d | ", counter++);
 
-        printf("vibration: %.3f g (%.3f m/s2) | calibrated vibration: %.3f m/s2 | dominant frequency: %.2f Hz | dX: %.3f | dY: %.3f | dZ: %.3f\n", vibration, vibration_ms2, vibration_ms2_calibrated, freq_hz, deltaX, deltaY, deltaZ);
+        printf("vibration: %.3f g (%.3f m/s2) | calibrated vibration: %.3f m/s2 | dominant frequency: %.2f Hz | dX: %.3f | dY: %.3f | dZ: %.3f\n", 
+               g_vibration_g, (g_vibration_g * 9.80665f), g_calibrated_ms2, g_dominant_freq_hz, g_deltaX, g_deltaY, g_deltaZ);
         
         printf("Data Accelerometer m/s², pitch, and roll!!\n");
         printf("Acc X: %.2f m/s2 | Y: %.2f m/s2 | Z: %.2f m/s2 || Pitch: %.2f deg | Roll: %.2f deg\n", 
-            accX_ms2, accY_ms2, accZ_ms2, pitch, roll);
+               g_accX_ms2, g_accY_ms2, g_accZ_ms2, g_pitch, g_roll);
 
         printf("PWM: %d | Motor: %s | Direction: %s\n\n", 
-            pwmValue, motorRunning ? "RUNNING" : "STOP", motorForwardDirection ? "FORWARD" : "REVERSE");
+               pwmValue, motorRunning ? "RUNNING" : "STOP", motorForwardDirection ? "FORWARD" : "REVERSE");
 
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
+}
+
+extern "C" void app_main(void) {
+    printf("Initializing...\n");
+    
+    wifi_init_softap();
+    start_webserver();
+
+    imu_init();
+    imu_calibrate();
+    
+    motor_init();
+    motorStop();
+    
+    pot_init();
+    button_init();
+
+    printf("Motor Control Initialized.\n");
+
+    xTaskCreatePinnedToCore(sensor_read_task, "sensor_task", 8192, NULL, 5, NULL, 0);
+    xTaskCreatePinnedToCore(control_and_print_task, "control_task", 4096, NULL, 4, NULL, 1);
 }
