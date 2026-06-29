@@ -39,7 +39,7 @@ static esp_err_t script_js_handler(httpd_req_t *req)
 static esp_err_t data_handler(httpd_req_t *req)
 {
     char resp_str[256];
-    snprintf(resp_str, sizeof(resp_str), "{\"vibration_g\": %.3f, \"calibrated_g\": %.3f, \"calibrated_ms2\": %.3f, \"dominant_freq_hz\": %.2f, \"pot_raw\": %d, \"pwm_value\": %d}", g_vibration_g, g_calibrated_g, g_calibrated_ms2, g_dominant_freq_hz, g_pot_raw, g_pwm_value);
+    snprintf(resp_str, sizeof(resp_str), "{\"target_g\": %.3f, \"vibration_g\": %.3f, \"calibrated_g\": %.3f, \"calibrated_ms2\": %.3f, \"dominant_freq_hz\": %.2f, \"pwm_value\": %d}", g_target_g, g_vibration_g, g_calibrated_g, g_calibrated_ms2, g_dominant_freq_hz, g_pwm_value);
             
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);

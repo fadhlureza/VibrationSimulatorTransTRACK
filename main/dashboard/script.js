@@ -9,6 +9,7 @@ function setupCanvas(canvasId) {
 }
 
 const graphs = {
+    targetG: setupCanvas("targetGCanvas"),
     pureG: setupCanvas("pureGCanvas"),
     calG: setupCanvas("calibratedGCanvas"),
     calMs2: setupCanvas("calibratedMs2Canvas"),
@@ -16,16 +17,16 @@ const graphs = {
     combined: {
         canvas: document.getElementById("combinedCanvas"),
         ctx: document.getElementById("combinedCanvas").getContext("2d"),
-        dataPot: Array(MAX_POINTS).fill(0),
+        dataTarget: Array(MAX_POINTS).fill(0),
         dataPwm: Array(MAX_POINTS).fill(0),
-        dataMs2: Array(MAX_POINTS).fill(0)
+        dataG: Array(MAX_POINTS).fill(0)
     },
     history: {
         canvas: document.getElementById("historyCanvas"),
         ctx: document.getElementById("historyCanvas").getContext("2d"),
-        dataPot: Array(MAX_HISTORY_POINTS).fill(0),
+        dataTarget: Array(MAX_HISTORY_POINTS).fill(0),
         dataPwm: Array(MAX_HISTORY_POINTS).fill(0),
-        dataMs2: Array(MAX_HISTORY_POINTS).fill(0)
+        dataG: Array(MAX_HISTORY_POINTS).fill(0)
     }
 };
 
@@ -69,7 +70,7 @@ function drawGraph(graph, label, color, maxValue) {
 }
 
 function drawCombinedGraph() {
-    const { canvas, ctx, dataPot, dataPwm, dataMs2 } = graphs.combined;
+    const { canvas, ctx, dataTarget, dataPwm, dataG } = graphs.combined;
     const w = canvas.width;
     const h = canvas.height;
 
@@ -85,9 +86,9 @@ function drawCombinedGraph() {
     ctx.stroke();
 
     ctx.font = "12px Arial";
-    ctx.fillStyle = "#FF9800"; ctx.fillText("Pot Raw", 10, 15);
+    ctx.fillStyle = "#FF9800"; ctx.fillText("Target G", 10, 15);
     ctx.fillStyle = "#9C27B0"; ctx.fillText("PWM", 70, 15);
-    ctx.fillStyle = "red";     ctx.fillText("m/s2", 110, 15);
+    ctx.fillStyle = "red";     ctx.fillText("G", 110, 15);
 
     const dx = w / (MAX_POINTS - 1);
 
@@ -106,13 +107,13 @@ function drawCombinedGraph() {
         ctx.stroke();
     }
 
-    drawLine(dataPot, "#FF9800", 4095); // Potensio (Max 4095)
-    drawLine(dataPwm, "#9C27B0", 210);  // PWM (Max 210)
-    drawLine(dataMs2, "red", 160);       // m/s2 (Max 40)
+    drawLine(dataTarget, "#FF9800", 16); // Target G (Max 16)
+    drawLine(dataPwm, "#9C27B0", 255);  // PWM (Max 255)
+    drawLine(dataG, "red", 16);        // G (Max 16)
 }
 
 function drawHistoryGraph() {
-    const { canvas, ctx, dataPot, dataPwm, dataMs2 } = graphs.history;
+    const { canvas, ctx, dataTarget, dataPwm, dataG } = graphs.history;
     const w = canvas.width;
     const h = canvas.height;
 
@@ -144,9 +145,9 @@ function drawHistoryGraph() {
         ctx.stroke();
     }
 
-    drawLine(dataPot, "#FF9800", 4095); // Potensio
-    drawLine(dataPwm, "#9C27B0", 210);  // PWM
-    drawLine(dataMs2, "red", 160);       // m/s2
+    drawLine(dataTarget, "#FF9800", 16); // Target G
+    drawLine(dataPwm, "#9C27B0", 255);  // PWM
+    drawLine(dataG, "red", 16);        // G
 }
 
 function updateData(graph, newValue) {
@@ -158,29 +159,32 @@ async function fetchData() {
     try {
         const response = await fetch('/api/data');
         const json = await response.json();
-
+        
+        document.getElementById('val-target').innerText = "[ " + json.target_g.toFixed(3) + " ]";
         document.getElementById('val-pure').innerText = "[ " + json.vibration_g.toFixed(3) + " ]";
         document.getElementById('val-calG').innerText = "[ " + json.calibrated_g.toFixed(3) + " ]";
         document.getElementById('val-calMs2').innerText = "[ " + json.calibrated_ms2.toFixed(3) + " ]";
         
-        document.getElementById('val-pot').innerText = json.pot_raw;
+        document.getElementById('val-targetG').innerText = json.target_g.toFixed(3);
         document.getElementById('val-pwm').innerText = json.pwm_value;
-        document.getElementById('val-combMs2').innerText = json.calibrated_ms2.toFixed(3);
+        document.getElementById('val-combG').innerText = json.calibrated_g.toFixed(3);
 
+        updateData(graphs.targetG, json.target_g);
         updateData(graphs.pureG, json.vibration_g);
         updateData(graphs.calG, json.calibrated_g);
         updateData(graphs.calMs2, json.calibrated_ms2);
         updateData(graphs.freq, json.dominant_freq_hz);
 
-        graphs.combined.dataPot.push(json.pot_raw || 0);
-        graphs.combined.dataPot.shift();
+        graphs.combined.dataTarget.push(json.target_g || 0);
+        graphs.combined.dataTarget.shift();
         
         graphs.combined.dataPwm.push(json.pwm_value || 0);
         graphs.combined.dataPwm.shift();
         
-        graphs.combined.dataMs2.push(json.calibrated_ms2 || 0);
-        graphs.combined.dataMs2.shift();
+        graphs.combined.dataG.push(json.calibrated_g || 0);
+        graphs.combined.dataG.shift();
 
+        drawGraph(graphs.targetG, "g", "orange", 16);
         drawGraph(graphs.pureG, "g", "blue", 16);
         drawGraph(graphs.calG, "g", "green", 16);
         drawGraph(graphs.calMs2, "m/s2", "red", 160);
@@ -189,18 +193,18 @@ async function fetchData() {
 
         fetchCounter++;
         if (fetchCounter >= 10) {
-            graphs.history.dataPot.push(json.pot_raw || 0);
-            graphs.history.dataPot.shift();
+            graphs.history.dataTarget.push(json.target_g || 0);
+            graphs.history.dataTarget.shift();
             
             graphs.history.dataPwm.push(json.pwm_value || 0);
             graphs.history.dataPwm.shift();
             
-            graphs.history.dataMs2.push(json.calibrated_ms2 || 0);
-            graphs.history.dataMs2.shift();
+            graphs.history.dataG.push(json.calibrated_g || 0);
+            graphs.history.dataG.shift();
 
-            document.getElementById('val-histPot').innerText = json.pot_raw;
+            document.getElementById('val-histTarget').innerText = json.target_g.toFixed(3);
             document.getElementById('val-histPwm').innerText = json.pwm_value;
-            document.getElementById('val-histMs2').innerText = json.calibrated_ms2.toFixed(3);
+            document.getElementById('val-histG').innerText = json.calibrated_g.toFixed(3);
             document.getElementById('val-freq').innerText = json.dominant_freq_hz.toFixed(2);
 
             drawHistoryGraph();
@@ -217,6 +221,7 @@ async function fetchData() {
 
 drawGraph(graphs.pureG, "g", "blue", 16);
 drawGraph(graphs.calG, "g", "green", 16);
+drawGraph(graphs.targetG, "g", "orange", 16);
 drawGraph(graphs.calMs2, "m/s2", "red", 160);
 drawGraph(graphs.freq, "Hz", "purple", 100);
 

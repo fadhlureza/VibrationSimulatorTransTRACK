@@ -14,15 +14,13 @@ void pot_init() {
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, POT_ADC_CHANNEL, &config));
 }
 
-int pot_read_pwm() {
+int pot_read_target() {
     int potValue = 0;
     adc_oneshot_read(adc1_handle, POT_ADC_CHANNEL, &potValue);
     
-    int pwmValue = (potValue * 210) / 4095;
-    if(pwmValue > 210) pwmValue = 210;
+    int targetValue = (potValue * 16000) / 4095;
 
     g_pot_raw = potValue;
-    g_pwm_value = pwmValue;
-    
-    return pwmValue;
+
+    return targetValue;
 }

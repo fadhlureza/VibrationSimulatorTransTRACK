@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "module/fastpid/fastpid.h"
 
 // Button flags
 extern volatile bool start_btn_flag;
@@ -52,9 +53,17 @@ extern volatile bool dir_btn_flag;
 #define I2C_MASTER_RX_BUF_DISABLE   0
 #define I2C_MASTER_TIMEOUT_MS       1000
 
+// PID
+const float KP = 0.05;
+const float KI = 0.15;
+const float KD = 0.0;
+const float HZ = 100.0;
+
+extern volatile float g_target_g;
+
 // Wi-Fi AP
 void wifi_init_softap(void);
-#define ESP_WIFI_SSID      "IMU_Sensor_AP"
+#define ESP_WIFI_SSID      "Vibration_Simulator"
 #define ESP_WIFI_PASS      "12345678"
 #define ESP_WIFI_CHANNEL   1
 #define ESP_MAX_STA_CONN   4

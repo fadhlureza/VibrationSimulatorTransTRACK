@@ -1,51 +1,62 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>IMU Sensor Data</title>
+    <title>Vibration Simulator</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:,">
 </head>
 <body>
     <h1>Vibration Simulator</h1>
-    <div class="canvas-container">
+    
+    <div class="graph-container">
+        
+        <div class="graph-wrapper">
+            <h3>Target (g) <span id="val-target" style="color: orange;">[ 0.00 ]</span></h3>
+            <canvas id="targetGCanvas" width="800" height="150"></canvas>
+        </div>
+        
         <div class="graph-wrapper">
             <h3>Pure (g) <span id="val-pure" style="color: blue;">[ 0.00 ]</span></h3>
             <canvas id="pureGCanvas" width="800" height="150"></canvas>
         </div>
+        
         <div class="graph-wrapper">
             <h3>Calibrated (g) <span id="val-calG" style="color: green;">[ 0.00 ]</span></h3>
             <canvas id="calibratedGCanvas" width="800" height="150"></canvas>
         </div>
+        
         <div class="graph-wrapper">
             <h3>Calibrated (m/s&sup2;) <span id="val-calMs2" style="color: red;">[ 0.00 ]</span></h3>
             <canvas id="calibratedMs2Canvas" width="800" height="150"></canvas>
         </div>
+        
         <div class="graph-wrapper">
             <h3>Dominant Frequency <span id="val-freq" style="color: purple;">[ 0.00 ]</span></h3>
             <canvas id="freqCanvas" width="800" height="150"></canvas>
         </div>
+        
         <div class="graph-wrapper">
             <h3>Output Combined 
                 <span style="font-size: 14px; font-weight: normal; margin-left: 10px;">
-                    ( Pot: <span id="val-pot" style="color: #FF9800; font-weight: bold;">0</span> | 
+                    ( Target G: <span id="val-targetG" style="color: #FF9800; font-weight: bold;">0</span> | 
                     PWM: <span id="val-pwm" style="color: #9C27B0; font-weight: bold;">0</span> | 
-                    m/s&sup2;: <span id="val-combMs2" style="color: red; font-weight: bold;">0.00</span> )
+                    G: <span id="val-combG" style="color: red; font-weight: bold;">0.00</span> )
                 </span>
             </h3>
             <canvas id="combinedCanvas" width="800" height="150"></canvas>
         </div>
+        
         <div class="graph-wrapper">
             <h3>History 1 Jam
                 <span style="font-size: 14px; font-weight: normal; margin-left: 10px;">
-                    ( Pot: <span id="val-histPot" style="color: #FF9800; font-weight: bold;">0</span> | 
+                    ( Target G: <span id="val-histTarget" style="color: #FF9800; font-weight: bold;">0</span> | 
                     PWM: <span id="val-histPwm" style="color: #9C27B0; font-weight: bold;">0</span> | 
-                    m/s&sup2;: <span id="val-histMs2" style="color: red; font-weight: bold;">0.00</span> )
+                    G: <span id="val-histG" style="color: red; font-weight: bold;">0.00</span> )
                 </span>
             </h3>
             <canvas id="historyCanvas" width="800" height="150"></canvas>
         </div>
-    </div>
-
-    <script src="script.js"></script>
+        
+    </div> <script src="script.js"></script>
 </body>
 </html>
