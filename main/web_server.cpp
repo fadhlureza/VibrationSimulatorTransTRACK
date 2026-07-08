@@ -2,8 +2,14 @@
 #include <esp_log.h>
 #include <stdio.h>
 #include "constant.h"
+#include "cJSON.h"
 
 static const char *TAG = "web_server";
+
+extern volatile float g_active_kp;
+extern volatile float g_active_ki;
+extern volatile float g_active_kd;
+extern volatile bool g_pid_update_flag;
 
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[]   asm("_binary_index_html_end");
@@ -46,6 +52,45 @@ static esp_err_t data_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t update_pid_handler(httpd_req_t *req)
+{
+    char buf[128];
+    int ret, remaining = req->content_len;
+
+    if (remaining >= sizeof(buf)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Payload too large");
+        return ESP_FAIL;
+    }
+
+    if ((ret = httpd_req_recv(req, buf, remaining)) <= 0) {
+        return ESP_FAIL;
+    }
+    buf[ret] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+
+    cJSON *kp_json = cJSON_GetObjectItem(root, "kp");
+    cJSON *ki_json = cJSON_GetObjectItem(root, "ki");
+    cJSON *kd_json = cJSON_GetObjectItem(root, "kd");
+
+    if (kp_json && ki_json && kd_json) {
+        g_active_kp = (float)kp_json->valuedouble;
+        g_active_ki = (float)ki_json->valuedouble;
+        g_active_kd = (float)kd_json->valuedouble;
+        g_pid_update_flag = true;
+    }
+
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"status\": \"PID coefficients updated\"}");
+    return ESP_OK;
+}
+
 static const httpd_uri_t uri_index = {
     .uri       = "/",
     .method    = HTTP_GET,
@@ -74,6 +119,13 @@ static const httpd_uri_t uri_data = {
     .user_ctx  = NULL
 };
 
+static const httpd_uri_t uri_update_pid = {
+    .uri       = "/api/update_pid",
+    .method    = HTTP_POST,
+    .handler   = update_pid_handler,
+    .user_ctx  = NULL
+};
+
 void start_webserver(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -86,6 +138,7 @@ void start_webserver(void)
         httpd_register_uri_handler(server, &uri_style);
         httpd_register_uri_handler(server, &uri_script);
         httpd_register_uri_handler(server, &uri_data);
+        httpd_register_uri_handler(server, &uri_update_pid);
         
         ESP_LOGI(TAG, "Web server started on port %d", config.server_port);
     } else {

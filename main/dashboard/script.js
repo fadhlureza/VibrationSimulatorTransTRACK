@@ -219,6 +219,40 @@ async function fetchData() {
     setTimeout(fetchData, 100);
 }
 
+async function updatePID(){
+    const kp = parseFloat(document.getElementById('input-kp').value) || 0;
+    const ki = parseFloat(document.getElementById('input-ki').value) || 0;
+    const kd = parseFloat(document.getElementById('input-kd').value) || 0;
+
+    const statusText = document.getElementById('update-status');
+    statusText.innerText = "Updating PID coefficients...";
+    statusText.style.color = "orange";
+
+    try {
+        const response = await fetch('/api/update_pid', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ kp : kp, ki : ki, kd : kd })
+        });
+    
+        if (response.ok) {
+            statusText.innerText = "PID coefficients updated successfully!";
+            statusText.style.color = "green";
+            setTimeout(() => { statusText.innerText = ""; }, 2000);
+        } else {
+            statusText.innerText = "Failed to update PID coefficients.";
+            statusText.style.color = "red";
+        } 
+    }
+    catch (err) {
+        console.error("Error updating PID coefficients:", err);
+        statusText.innerText = "Error updating PID coefficients.";
+        statusText.style.color = "red";
+    }
+}
+
 drawGraph(graphs.pureG, "g", "blue", 16);
 drawGraph(graphs.calG, "g", "green", 16);
 drawGraph(graphs.targetG, "g", "orange", 16);

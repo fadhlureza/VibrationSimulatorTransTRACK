@@ -54,8 +54,8 @@ extern volatile bool dir_btn_flag;
 #define I2C_MASTER_TIMEOUT_MS       1000
 
 // PID
-const float KP = 0.05;
-const float KI = 0.15;
+const float KP = 0.13;
+const float KI = 0.3;
 const float KD = 0.0;
 const float HZ = 100.0;
 

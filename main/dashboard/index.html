@@ -8,6 +8,21 @@
 <body>
     <h1>Vibration Simulator</h1>
     
+    <div class="control-panel" style="background-color: #f8f9fa; padding: 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+        <h3 style="margin-top: 0; color: #333;">PID Coefficients</h3>
+        <label style="font-weight: bold; margin-right: 10px; color: #333;">
+            KP: <input type="number" id="input-kp" step="0.001" value="1.000" style="width: 80px; margin-right: 20px;">
+        </label>
+        <label style="font-weight: bold; margin-right: 10px; color: #333;">
+            KI: <input type="number" id="input-ki" step="0.001" value="0.000" style="width: 80px; margin-right: 20px;">
+        </label>
+        <label style="font-weight: bold; margin-right: 10px; color: #333;">
+            KD: <input type="number" id="input-kd" step="0.001" value="0.000" style="width: 80px; margin-right: 20px;">
+        </label>
+        <button onclick="updatePID()" style="padding: 6px 20px; font-weight: bold; cursor: pointer; background-color: #2196F3; color: white; border: none; border-radius: 4px;">UPDATE PID</button>
+        <span id="update-status" style="margin-left: 15px; font-weight: bold;"></span>
+    </div>
+
     <div class="graph-container">
         
         <div class="graph-wrapper">
