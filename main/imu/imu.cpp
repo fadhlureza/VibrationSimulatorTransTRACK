@@ -12,27 +12,36 @@ static const char *TAG = "BMI160";
 
 static const int I2C_RETRY_COUNT = 3;
 static const int RECOVERY_COOLDOWN_MS = 5000;
-static const int HEALTH_CHECK_INTERVAL = 100;
-static const int RECOVERY_FAIL_THRESHOLD = 3;
+static const int HEALTH_CHECK_INTERVAL = 200;
+static const int RECOVERY_FAIL_THRESHOLD = 5;
 
-static float baseX = 0;
-static float baseY = 0;
-static float baseZ = 0;
+// Calibration baselines
+static float baseX = 0.0f;
+static float baseY = 0.0f;
+static float baseZ = 0.0f;
+static float s_flat_baseX = 0.0f;
+static float s_flat_baseY = 0.0f;
+static float s_flat_baseZ = 1.0f;
+static float bias_gx = 0.0f;
+static float bias_gy = 0.0f;
+static float bias_gz = 0.0f;
+static float s_initial_pitch_deg = 0.0f;
+static volatile float s_integrated_pitch_deg = 0.0f;
+static volatile bool s_is_calibrated = false;
 
+// FFT state (128 samples)
 static float vReal[FFT_SAMPLES];
 static float vImag[FFT_SAMPLES];
 static int sampleIndex = 0;
 static int64_t first_sample_time = 0;
-static float dominant_freq_hz = 0.0;
+static float dominant_freq_hz = 0.0f;
 
-static struct {
-    float accX_g, accY_g, accZ_g;
-    float vibration, vibration_ms2, vibration_ms2_calibrated;
-    float deltaX, deltaY, deltaZ;
-    float accX_ms2, accY_ms2, accZ_ms2, accZ_ms2_calibrated;
-    float pitch, roll;
-    bool valid;
-} last_valid = {};
+// Thread-safe snapshot state
+static imu_snapshot_t s_latest_snapshot = {};
+static portMUX_TYPE s_imu_mux = portMUX_INITIALIZER_UNLOCKED;
+
+static TaskHandle_t s_imu_task_handle = NULL;
+static esp_timer_handle_t s_imu_timer = NULL;
 
 static int read_cycle_count = 0;
 static int consecutive_failures = 0;
@@ -57,15 +66,15 @@ static void compute_FFT(float *vR, float *vI, uint16_t samples) {
         j += k;
     }
 
-    float c1 = -1.0, c2 = 0.0;
+    float c1 = -1.0f, c2 = 0.0f;
     uint16_t l2 = 1;
     for (uint16_t l = 0; (1 << l) < samples; l++) {
         uint16_t l1 = l2;
         l2 <<= 1;
-        float u1 = 1.0;
-        float u2 = 0.0;
-        for (uint16_t j = 0; j < l1; j++) {
-            for (uint16_t i = j; i < samples; i += l2) {
+        float u1 = 1.0f;
+        float u2 = 0.0f;
+        for (uint16_t m = 0; m < l1; m++) {
+            for (uint16_t i = m; i < samples; i += l2) {
                 uint16_t i1 = i + l1;
                 float t1 = u1 * vR[i1] - u2 * vI[i1];
                 float t2 = u1 * vI[i1] + u2 * vR[i1];
@@ -78,17 +87,17 @@ static void compute_FFT(float *vR, float *vI, uint16_t samples) {
             u2 = (u1 * c2) + (u2 * c1);
             u1 = z;
         }
-        c2 = sqrt((1.0 - c1) / 2.0);
+        c2 = sqrtf((1.0f - c1) / 2.0f);
         if (l == 0) c2 = -c2;
-        c1 = sqrt((1.0 + c1) / 2.0);
+        c1 = sqrtf((1.0f + c1) / 2.0f);
     }
 }
 
 static esp_err_t i2c_master_init(void) {
     i2c_config_t conf = {};
     conf.mode = I2C_MODE_MASTER;
-    conf.sda_io_num = I2C_MASTER_SDA_IO;
-    conf.scl_io_num = I2C_MASTER_SCL_IO;
+    conf.sda_io_num = (gpio_num_t)I2C_MASTER_SDA_IO;
+    conf.scl_io_num = (gpio_num_t)I2C_MASTER_SCL_IO;
     conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
     conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
     conf.master.clk_speed = I2C_MASTER_FREQ_HZ;
@@ -127,21 +136,29 @@ static esp_err_t readRegister(uint8_t reg, uint8_t *buf, size_t len) {
     return err;
 }
 
-static esp_err_t read_accel_burst(int16_t *x, int16_t *y, int16_t *z) {
-    uint8_t data[6] = {0};
-    esp_err_t err = readRegister(ACC_X_LSB, data, sizeof(data));
+static esp_err_t read_motion_burst(int16_t *gx, int16_t *gy, int16_t *gz,
+                                  int16_t *ax, int16_t *ay, int16_t *az) {
+    uint8_t data[12] = {0};
+    esp_err_t err = readRegister(GYR_X_LSB, data, sizeof(data));
     if (err != ESP_OK) {
         return err;
     }
 
-    *x = (int16_t)((data[1] << 8) | data[0]);
-    *y = (int16_t)((data[3] << 8) | data[2]);
-    *z = (int16_t)((data[5] << 8) | data[4]);
+    *gx = (int16_t)((data[1] << 8) | data[0]);
+    *gy = (int16_t)((data[3] << 8) | data[2]);
+    *gz = (int16_t)((data[5] << 8) | data[4]);
+    *ax = (int16_t)((data[7] << 8) | data[6]);
+    *ay = (int16_t)((data[9] << 8) | data[8]);
+    *az = (int16_t)((data[11] << 8) | data[10]);
     return ESP_OK;
 }
 
-static float rawToG(int16_t raw) {
-    return raw / 2048.0f;
+static inline float rawToG(int16_t raw) {
+    return (float)raw / 2048.0f; // ±16g range
+}
+
+static inline float rawToDPS(int16_t raw) {
+    return (float)raw / GYRO_LSB_PER_DPS; // ±500 deg/s range (65.536 LSB/deg/s)
 }
 
 static esp_err_t bmi160_check_who_am_i(void) {
@@ -158,87 +175,81 @@ static esp_err_t bmi160_check_who_am_i(void) {
 }
 
 static esp_err_t bmi160_configure(void) {
+    // Settle delay after I2C bus initialization
+    vTaskDelay(pdMS_TO_TICKS(10));
 
-    esp_err_t err = writeRegister(CMD_REG, 0x11);
-    if (err != ESP_OK) {
-        return err;
-    }
+    // 1. Power on Accelerometer in normal mode
+    esp_err_t err = writeRegister(CMD_REG, BMI160_CMD_ACC_NORMAL);
+    if (err != ESP_OK) return err;
+    vTaskDelay(pdMS_TO_TICKS(10)); // Allow ACC PMU to settle (min 3.8 ms per datasheet)
 
+    // 2. Power on Gyroscope in normal mode
+    err = writeRegister(CMD_REG, BMI160_CMD_GYR_NORMAL);
+    if (err != ESP_OK) return err;
+    vTaskDelay(pdMS_TO_TICKS(60)); // Allow Gyro analog PLL to stabilize (min 55-80 ms per datasheet)
+
+    // 3. Accelerometer config: 200 Hz ODR, normal bandwidth
     err = writeRegister(ACC_CONF, 0x2C);
-    if (err != ESP_OK) {
-        return err;
-    }
+    if (err != ESP_OK) return err;
 
+    // 4. Accelerometer range: ±16g
     err = writeRegister(ACC_RANGE, 0x0C);
-    if (err != ESP_OK) {
-        return err;
-    }
+    if (err != ESP_OK) return err;
 
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    // 5. Gyroscope config: 200 Hz ODR, normal bandwidth
+    err = writeRegister(GYR_CONF, 0x29);
+    if (err != ESP_OK) return err;
+
+    // 6. Gyroscope range: ±500 deg/s
+    err = writeRegister(GYR_RANGE, 0x02);
+    if (err != ESP_OK) return err;
+
+    // Allow internal digital filters and sensor registers to stabilize
+    vTaskDelay(pdMS_TO_TICKS(50));
     return ESP_OK;
 }
 
-static esp_err_t read_accel_burst_with_retry(int16_t *x, int16_t *y, int16_t *z) {
+static esp_err_t read_motion_burst_with_retry(int16_t *gx, int16_t *gy, int16_t *gz,
+                                             int16_t *ax, int16_t *ay, int16_t *az) {
     esp_err_t err = ESP_FAIL;
     for (int attempt = 0; attempt < I2C_RETRY_COUNT; attempt++) {
-        err = read_accel_burst(x, y, z);
+        err = read_motion_burst(gx, gy, gz, ax, ay, az);
         if (err == ESP_OK) {
             return ESP_OK;
         }
-        vTaskDelay(5 / portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(2));
     }
     return err;
 }
 
-static void copy_last_valid_outputs(
-    float *vibration, float *vibration_ms2, float *vibration_ms2_calibrated,
-    float *deltaX, float *deltaY, float *deltaZ,
-    float *accX_ms2, float *accY_ms2, float *accZ_ms2,
-    float *pitch, float *roll, float *output_freq_hz, float *accZ_ms2_calibrated) {
-    *vibration = last_valid.vibration;
-    *vibration_ms2 = last_valid.vibration_ms2;
-    *vibration_ms2_calibrated = last_valid.vibration_ms2_calibrated;
-    *deltaX = last_valid.deltaX;
-    *deltaY = last_valid.deltaY;
-    *deltaZ = last_valid.deltaZ;
-    *accX_ms2 = last_valid.accX_ms2;
-    *accY_ms2 = last_valid.accY_ms2;
-    *accZ_ms2 = last_valid.accZ_ms2;
-    *pitch = last_valid.pitch;
-    *roll = last_valid.roll;
-    *output_freq_hz = dominant_freq_hz;
-    *accZ_ms2_calibrated = last_valid.accZ_ms2_calibrated;
-}
-
-static void update_fft(float accZ_ms2_calibrated) {
+static void update_fft(float vibration_calibrated) {
     if (sampleIndex == 0) {
         first_sample_time = esp_timer_get_time();
     }
 
-    vReal[sampleIndex] = accZ_ms2_calibrated;
-    vImag[sampleIndex] = 0.0;
+    vReal[sampleIndex] = vibration_calibrated;
+    vImag[sampleIndex] = 0.0f;
     sampleIndex++;
 
     if (sampleIndex >= FFT_SAMPLES) {
         int64_t end_time = esp_timer_get_time();
-
-        float time_elapsed_sec = (end_time - first_sample_time) / 1000000.0;
-        float sampling_freq = FFT_SAMPLES / time_elapsed_sec;
+        float time_elapsed_sec = (float)(end_time - first_sample_time) / 1000000.0f;
+        float sampling_freq = (time_elapsed_sec > 0.001f) ? ((float)FFT_SAMPLES / time_elapsed_sec) : 200.0f;
 
         compute_FFT(vReal, vImag, FFT_SAMPLES);
 
-        float max_magnitude = 0.0;
+        float max_magnitude = 0.0f;
         int peak_index = 0;
 
         for (int i = 1; i < (FFT_SAMPLES / 2); i++) {
-            float magnitude = sqrt((vReal[i] * vReal[i]) + (vImag[i] * vImag[i]));
+            float magnitude = sqrtf((vReal[i] * vReal[i]) + (vImag[i] * vImag[i]));
             if (magnitude > max_magnitude) {
                 max_magnitude = magnitude;
                 peak_index = i;
             }
         }
 
-        dominant_freq_hz = (peak_index * sampling_freq) / FFT_SAMPLES;
+        dominant_freq_hz = ((float)peak_index * sampling_freq) / (float)FFT_SAMPLES;
         sampleIndex = 0;
     }
 }
@@ -259,7 +270,7 @@ static esp_err_t imu_recover(void) {
         return err;
     }
 
-    vTaskDelay(50 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(50));
 
     err = bmi160_configure();
     if (err != ESP_OK) {
@@ -274,11 +285,149 @@ static esp_err_t imu_recover(void) {
     }
 
     sampleIndex = 0;
-    imu_calibrate();
     consecutive_failures = 0;
 
-    ESP_LOGI(TAG, "BMI160 recovery successful, baseline re-calibrated");
+    ESP_LOGI(TAG, "BMI160 recovery successful");
     return ESP_OK;
+}
+
+// 200 Hz Timer callback
+static void IRAM_ATTR imu_timer_callback(void* arg) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    if (s_imu_task_handle != NULL) {
+        vTaskNotifyGiveFromISR(s_imu_task_handle, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+
+// Dedicated 200 Hz IMU processing task on Core 1
+static void imu_task(void *pvParameters) {
+    int64_t last_time_us = esp_timer_get_time();
+
+    while (1) {
+        // Wait for deterministic 200 Hz (5 ms) timer notification
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        int64_t now_us = esp_timer_get_time();
+        float dt = (float)(now_us - last_time_us) / 1000000.0f;
+        last_time_us = now_us;
+
+        // Guard against abnormal dt (e.g. after long debug delay)
+        if (dt <= 0.0001f || dt > 0.05f) {
+            dt = 0.005f; // Fallback to 5 ms (200 Hz)
+        }
+
+        read_cycle_count++;
+        if (read_cycle_count >= HEALTH_CHECK_INTERVAL) {
+            read_cycle_count = 0;
+            if (bmi160_check_who_am_i() != ESP_OK) {
+                ESP_LOGW(TAG, "Periodic WHO_AM_I check failed");
+            }
+        }
+
+        int16_t gx_raw, gy_raw, gz_raw, ax_raw, ay_raw, az_raw;
+        esp_err_t err = read_motion_burst_with_retry(&gx_raw, &gy_raw, &gz_raw, &ax_raw, &ay_raw, &az_raw);
+
+        if (err != ESP_OK) {
+            consecutive_failures++;
+            if (consecutive_failures >= RECOVERY_FAIL_THRESHOLD) {
+                imu_recover();
+            }
+            portENTER_CRITICAL(&s_imu_mux);
+            s_latest_snapshot.sensor_ok = false;
+            portEXIT_CRITICAL(&s_imu_mux);
+            continue;
+        }
+
+        consecutive_failures = 0;
+
+        // Convert raw values to physical units
+        float gx_dps = rawToDPS(gx_raw);
+        float gy_dps = rawToDPS(gy_raw);
+        (void)gz_raw; // Z gyro rate reserved for future yaw estimation
+
+        float accX_g = rawToG(ax_raw);
+        float accY_g = rawToG(ay_raw);
+        float accZ_g = rawToG(az_raw);
+
+        // Compute live pitch rate with resting bias removed
+        float raw_pitch_rate = (PITCH_AXIS_IS_Y ? (gy_dps - bias_gy) : (gx_dps - bias_gx));
+        float pitch_rate_dps = raw_pitch_rate * PITCH_SIGN;
+
+        // Integrate pure gyro pitch angle
+        if (s_is_calibrated) {
+            s_integrated_pitch_deg += pitch_rate_dps * dt;
+        }
+
+        // Accelerometer tilt angle calculations (reference / static)
+        float acc_roll = atan2f(accY_g, accZ_g) * 180.0f / (float)M_PI;
+        float acc_pitch = atan2f(-accX_g, sqrtf(accY_g * accY_g + accZ_g * accZ_g)) * 180.0f / (float)M_PI;
+
+        // --- Dynamic Gravity Tilt Compensation ---
+        // Expected gravity vector under current table tilt angle relative to true Earth level (0.0 deg)
+        float expected_gx = s_flat_baseX;
+        float expected_gy = s_flat_baseY;
+        float expected_gz = s_flat_baseZ;
+
+        if (s_is_calibrated) {
+            float pitch_rad = s_integrated_pitch_deg * ((float)M_PI / 180.0f);
+            float cos_p = cosf(pitch_rad);
+            float sin_p = sinf(pitch_rad);
+
+            #if PITCH_AXIS_IS_Y
+            expected_gx = (s_flat_baseX * cos_p) + (s_flat_baseZ * sin_p);
+            expected_gy = s_flat_baseY;
+            expected_gz = (-s_flat_baseX * sin_p) + (s_flat_baseZ * cos_p);
+            #else
+            // Standard pitch rotation around X-axis
+            expected_gx = (s_flat_baseX * cos_p) - (s_flat_baseZ * sin_p);
+            expected_gy = s_flat_baseY;
+            expected_gz = (s_flat_baseX * sin_p) + (s_flat_baseZ * cos_p);
+            #endif
+        }
+
+        // Subtract the expected static gravity vector: pure dynamic vibration remains
+        float deltaX = accX_g - expected_gx;
+        float deltaY = accY_g - expected_gy;
+        float deltaZ = accZ_g - expected_gz;
+
+        float vibration = sqrtf(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+        float vibration_ms2 = vibration * 9.80665f;
+        float vibration_ms2_calibrated = (vibration_ms2 * 1.226f) + 0.145f;
+        float accZ_ms2_calibrated = (accZ_g * 9.80665f * 1.226f) + 0.145f;
+
+        float accX_ms2 = accX_g * 9.80665f;
+        float accY_ms2 = accY_g * 9.80665f;
+        float accZ_ms2 = accZ_g * 9.80665f;
+
+        // Update FFT with dynamic calibrated vibration
+        update_fft(vibration_ms2_calibrated);
+
+        // Update thread-safe snapshot
+        portENTER_CRITICAL(&s_imu_mux);
+        s_latest_snapshot.pitch_gyro_deg = s_integrated_pitch_deg;
+        s_latest_snapshot.pitch_acc_deg = acc_pitch;
+        s_latest_snapshot.roll_deg = acc_roll;
+        s_latest_snapshot.pitch_rate_dps = pitch_rate_dps;
+
+        s_latest_snapshot.acc_x_ms2 = accX_ms2;
+        s_latest_snapshot.acc_y_ms2 = accY_ms2;
+        s_latest_snapshot.acc_z_ms2 = accZ_ms2;
+        s_latest_snapshot.acc_z_ms2_calibrated = accZ_ms2_calibrated;
+
+        s_latest_snapshot.vibration_g = vibration;
+        s_latest_snapshot.vibration_ms2 = vibration_ms2;
+        s_latest_snapshot.vibration_ms2_calibrated = vibration_ms2_calibrated;
+
+        s_latest_snapshot.delta_x = deltaX;
+        s_latest_snapshot.delta_y = deltaY;
+        s_latest_snapshot.delta_z = deltaZ;
+
+        s_latest_snapshot.dominant_freq_hz = dominant_freq_hz;
+        s_latest_snapshot.is_calibrated = s_is_calibrated;
+        s_latest_snapshot.sensor_ok = true;
+        portEXIT_CRITICAL(&s_imu_mux);
+    }
 }
 
 bool imu_init(void) {
@@ -297,138 +446,139 @@ bool imu_init(void) {
         return false;
     }
 
-    ESP_LOGI(TAG, "BMI160 initialized (CHIP_ID 0x%02X)", BMI160_CHIP_ID);
+    // Create 200 Hz IMU processing task pinned to Core 1
+    xTaskCreatePinnedToCore(imu_task, "imu_task", 4096, NULL, 6, &s_imu_task_handle, 1);
+
+    // Create and start periodic 200 Hz (5000 us) hardware timer
+    esp_timer_create_args_t timer_args = {};
+    timer_args.callback = &imu_timer_callback;
+    timer_args.arg = NULL;
+    timer_args.dispatch_method = ESP_TIMER_TASK;
+    timer_args.name = "imu_200hz_timer";
+    timer_args.skip_unhandled_events = false;
+
+    ESP_ERROR_CHECK(esp_timer_create(&timer_args, &s_imu_timer));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(s_imu_timer, 5000)); // 5 ms = 200 Hz
+
+    ESP_LOGI(TAG, "BMI160 initialized with Gyroscope enabled (CHIP_ID 0x%02X)", BMI160_CHIP_ID);
     return true;
 }
 
 void imu_calibrate(void) {
-    const int sampleCount = 100;
+    const int discardCount = 50;  // 50 * 10ms = 0.5s settling
+    const int sampleCount = 350;  // 350 * 10ms = 3.5s sampling (total ~4.0s)
 
-    float sumX = 0;
-    float sumY = 0;
-    float sumZ = 0;
+    printf("Calibrating IMU baseline & gyro resting bias (approx 4 sec)...\n");
+    printf("Pastikan meja simulator diam dan rata...\n");
+
+    // Phase 1: Discard initial samples while gyro analog PLL settles
+    for (int i = 0; i < discardCount; i++) {
+        int16_t gx, gy, gz, ax, ay, az;
+        read_motion_burst_with_retry(&gx, &gy, &gz, &ax, &ay, &az);
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    // Phase 2: Accumulate high-precision resting baseline
+    float sum_ax = 0.0f, sum_ay = 0.0f, sum_az = 0.0f;
+    float sum_gx = 0.0f, sum_gy = 0.0f, sum_gz = 0.0f;
     int validSamples = 0;
 
-    printf("Calibrating IMU baseline...\n");
-    printf("Jangan gerakkan sensor...\n");
-
     for (int i = 0; i < sampleCount; i++) {
-        int16_t accX_raw, accY_raw, accZ_raw;
-        esp_err_t err = read_accel_burst_with_retry(&accX_raw, &accY_raw, &accZ_raw);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "Calibration sample %d failed, skipping", i);
-            vTaskDelay(10 / portTICK_PERIOD_MS);
-            continue;
+        int16_t gx_raw, gy_raw, gz_raw, ax_raw, ay_raw, az_raw;
+        esp_err_t err = read_motion_burst_with_retry(&gx_raw, &gy_raw, &gz_raw, &ax_raw, &ay_raw, &az_raw);
+        if (err == ESP_OK) {
+            sum_ax += rawToG(ax_raw);
+            sum_ay += rawToG(ay_raw);
+            sum_az += rawToG(az_raw);
+
+            sum_gx += rawToDPS(gx_raw);
+            sum_gy += rawToDPS(gy_raw);
+            sum_gz += rawToDPS(gz_raw);
+            validSamples++;
         }
-
-        sumX += rawToG(accX_raw);
-        sumY += rawToG(accY_raw);
-        sumZ += rawToG(accZ_raw);
-        validSamples++;
-
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 
     if (validSamples == 0) {
-        ESP_LOGE(TAG, "Calibration failed: no valid samples");
+        ESP_LOGE(TAG, "Calibration failed: no valid I2C samples");
         return;
     }
 
-    baseX = sumX / validSamples;
-    baseY = sumY / validSamples;
-    baseZ = sumZ / validSamples;
+    baseX = sum_ax / (float)validSamples;
+    baseY = sum_ay / (float)validSamples;
+    baseZ = sum_az / (float)validSamples;
 
-    printf("Baseline selesai:\n");
-    printf("baseX: %.3f g | baseY: %.3f g | baseZ: %.3f g\n", baseX, baseY, baseZ);
+    bias_gx = sum_gx / (float)validSamples;
+    bias_gy = sum_gy / (float)validSamples;
+    bias_gz = sum_gz / (float)validSamples;
+
+    // Calculate initial resting pitch angle from baseline accelerometer gravity vector
+    s_initial_pitch_deg = atan2f(-baseX, sqrtf(baseY * baseY + baseZ * baseZ)) * 180.0f / (float)M_PI;
+    s_integrated_pitch_deg = s_initial_pitch_deg;
+
+    // De-rotate measured gravity vector to true Earth horizontal level (0.0 deg)
+    // so vibration baseline is referenced to true level even if booted while tilted
+    float boot_pitch_rad = s_initial_pitch_deg * ((float)M_PI / 180.0f);
+    float cos_boot = cosf(-boot_pitch_rad);
+    float sin_boot = sinf(-boot_pitch_rad);
+
+    #if PITCH_AXIS_IS_Y
+    s_flat_baseX = (baseX * cos_boot) + (baseZ * sin_boot);
+    s_flat_baseY = baseY;
+    s_flat_baseZ = (-baseX * sin_boot) + (baseZ * cos_boot);
+    #else
+    s_flat_baseX = (baseX * cos_boot) - (baseZ * sin_boot);
+    s_flat_baseY = baseY;
+    s_flat_baseZ = (baseX * sin_boot) + (baseZ * cos_boot);
+    #endif
+
+    s_is_calibrated = true;
+
+    printf("Kalibrasi selesai:\n");
+    printf("Baseline Accel -> X: %.3f g | Y: %.3f g | Z: %.3f g\n", baseX, baseY, baseZ);
+    printf("Level Accel Ref-> X: %.3f g | Y: %.3f g | Z: %.3f g\n", s_flat_baseX, s_flat_baseY, s_flat_baseZ);
+    printf("Bias Gyro      -> X: %.2f dps | Y: %.2f dps | Z: %.2f dps\n", bias_gx, bias_gy, bias_gz);
+    printf("Starting Pitch -> %.2f deg (motor will home to 0.00 deg)\n", s_initial_pitch_deg);
 }
 
-void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_calibrated, float* deltaX, float* deltaY, float* deltaZ,
-                   float* accX_ms2, float* accY_ms2, float* accZ_ms2,
-                   float* pitch, float* roll, float* output_freq_hz, float* accZ_ms2_calibrated) {
-    read_cycle_count++;
-    if (read_cycle_count >= HEALTH_CHECK_INTERVAL) {
-        read_cycle_count = 0;
-        esp_err_t health_err = bmi160_check_who_am_i();
-        if (health_err != ESP_OK) {
-            ESP_LOGW(TAG, "Periodic WHO_AM_I health check failed");
-        }
+imu_snapshot_t imu_get_snapshot(void) {
+    imu_snapshot_t copy;
+    portENTER_CRITICAL(&s_imu_mux);
+    copy = s_latest_snapshot;
+    portEXIT_CRITICAL(&s_imu_mux);
+    return copy;
+}
+
+void imu_standstill_realign(float alpha) {
+    if (alpha <= 0.0f) return;
+    if (alpha > 1.0f) alpha = 1.0f;
+
+    portENTER_CRITICAL(&s_imu_mux);
+    if (s_is_calibrated) {
+        float target = s_latest_snapshot.pitch_acc_deg;
+        s_integrated_pitch_deg = ((1.0f - alpha) * s_integrated_pitch_deg) + (alpha * target);
+        s_latest_snapshot.pitch_gyro_deg = s_integrated_pitch_deg;
     }
+    portEXIT_CRITICAL(&s_imu_mux);
+}
 
-    int16_t accX_raw, accY_raw, accZ_raw;
-    esp_err_t err = read_accel_burst_with_retry(&accX_raw, &accY_raw, &accZ_raw);
+// Backward-compatible interface
+void imu_read_data(float* vibration, float* vibration_ms2, float* vibration_ms2_calibrated, float* deltaX, float* deltaY, float* deltaZ, 
+                    float* accX_ms2, float* accY_ms2, float* accZ_ms2,
+                    float* pitch, float* roll, float* output_freq_hz, float* accZ_ms2_calibrated) {
+    imu_snapshot_t snap = imu_get_snapshot();
 
-    if (err != ESP_OK) {
-        consecutive_failures++;
-        ESP_LOGW(TAG, "Accel read failed (%d consecutive failures)", consecutive_failures);
-
-        if (consecutive_failures >= RECOVERY_FAIL_THRESHOLD) {
-            imu_recover();
-        }
-
-        if (last_valid.valid) {
-            copy_last_valid_outputs(
-                vibration, vibration_ms2, vibration_ms2_calibrated,
-                deltaX, deltaY, deltaZ,
-                accX_ms2, accY_ms2, accZ_ms2,
-                pitch, roll, output_freq_hz, accZ_ms2_calibrated);
-        } else {
-            *output_freq_hz = dominant_freq_hz;
-        }
-        return;
-    }
-
-    consecutive_failures = 0;
-
-    float accX_g = rawToG(accX_raw);
-    float accY_g = rawToG(accY_raw);
-    float accZ_g = rawToG(accZ_raw);
-
-    float out_deltaX = accX_g - baseX;
-    float out_deltaY = accY_g - baseY;
-    float out_deltaZ = accZ_g - baseZ;
-
-    float out_vibration = sqrt(out_deltaX * out_deltaX + out_deltaY * out_deltaY + out_deltaZ * out_deltaZ);
-    float out_vibration_ms2 = out_vibration * 9.80665f;
-    float out_vibration_ms2_calibrated = (out_vibration_ms2 * 1.226f) + 0.145f;
-    float out_accZ_ms2_calibrated = (accZ_g * 9.80665f * 1.226f) + 0.145f;
-
-    float out_roll = atan2(accY_g, accZ_g) * 180.0f / (float)M_PI;
-    float out_pitch = atan2(-accX_g, sqrt(accY_g * accY_g + accZ_g * accZ_g)) * 180.0f / (float)M_PI;
-
-    float out_accX_ms2 = accX_g * 9.80665f;
-    float out_accY_ms2 = accY_g * 9.80665f;
-    float out_accZ_ms2 = accZ_g * 9.80665f;
-
-    last_valid.accX_g = accX_g;
-    last_valid.accY_g = accY_g;
-    last_valid.accZ_g = accZ_g;
-    last_valid.vibration = out_vibration;
-    last_valid.vibration_ms2 = out_vibration_ms2;
-    last_valid.vibration_ms2_calibrated = out_vibration_ms2_calibrated;
-    last_valid.deltaX = out_deltaX;
-    last_valid.deltaY = out_deltaY;
-    last_valid.deltaZ = out_deltaZ;
-    last_valid.accX_ms2 = out_accX_ms2;
-    last_valid.accY_ms2 = out_accY_ms2;
-    last_valid.accZ_ms2 = out_accZ_ms2;
-    last_valid.accZ_ms2_calibrated = out_accZ_ms2_calibrated;
-    last_valid.pitch = out_pitch;
-    last_valid.roll = out_roll;
-    last_valid.valid = true;
-
-    *deltaX = out_deltaX;
-    *deltaY = out_deltaY;
-    *deltaZ = out_deltaZ;
-    *vibration = out_vibration;
-    *vibration_ms2 = out_vibration_ms2;
-    *vibration_ms2_calibrated = out_vibration_ms2_calibrated;
-    *roll = out_roll;
-    *pitch = out_pitch;
-    *accX_ms2 = out_accX_ms2;
-    *accY_ms2 = out_accY_ms2;
-    *accZ_ms2 = out_accZ_ms2;
-
-    update_fft(out_vibration_ms2_calibrated);
-    *output_freq_hz = dominant_freq_hz;
-    *accZ_ms2_calibrated = out_accZ_ms2_calibrated;
+    if (vibration)                *vibration = snap.vibration_g;
+    if (vibration_ms2)            *vibration_ms2 = snap.vibration_ms2;
+    if (vibration_ms2_calibrated) *vibration_ms2_calibrated = snap.vibration_ms2_calibrated;
+    if (deltaX)                   *deltaX = snap.delta_x;
+    if (deltaY)                   *deltaY = snap.delta_y;
+    if (deltaZ)                   *deltaZ = snap.delta_z;
+    if (accX_ms2)                 *accX_ms2 = snap.acc_x_ms2;
+    if (accY_ms2)                 *accY_ms2 = snap.acc_y_ms2;
+    if (accZ_ms2)                 *accZ_ms2 = snap.acc_z_ms2;
+    if (pitch)                    *pitch = snap.pitch_gyro_deg; // Control pitch is integrated gyro
+    if (roll)                     *roll = snap.roll_deg;
+    if (output_freq_hz)           *output_freq_hz = snap.dominant_freq_hz;
+    if (accZ_ms2_calibrated)      *accZ_ms2_calibrated = snap.acc_z_ms2_calibrated;
 }

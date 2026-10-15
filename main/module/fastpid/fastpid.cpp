@@ -1,4 +1,4 @@
-#include "FastPID.h"
+#include "fastpid.h"
 #include <stdint.h>
 #include <stdbool.h>
 

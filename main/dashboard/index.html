@@ -1,77 +1,368 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Vibration Simulator</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VST - Vibration Simulator Table | TransTRACK</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:,">
 </head>
-<body>
-    <h1>Vibration Simulator</h1>
-    
-    <div class="control-panel" style="background-color: #f8f9fa; padding: 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
-        <h3 style="margin-top: 0; color: #333;">PID Coefficients</h3>
-        <label style="font-weight: bold; margin-right: 10px; color: #333;">
-            KP: <input type="number" id="input-kp" step="0.001" value="1.000" style="width: 80px; margin-right: 20px;">
-        </label>
-        <label style="font-weight: bold; margin-right: 10px; color: #333;">
-            KI: <input type="number" id="input-ki" step="0.001" value="0.000" style="width: 80px; margin-right: 20px;">
-        </label>
-        <label style="font-weight: bold; margin-right: 10px; color: #333;">
-            KD: <input type="number" id="input-kd" step="0.001" value="0.000" style="width: 80px; margin-right: 20px;">
-        </label>
-        <button onclick="updatePID()" style="padding: 6px 20px; font-weight: bold; cursor: pointer; background-color: #2196F3; color: white; border: none; border-radius: 4px;">UPDATE PID</button>
-        <span id="update-status" style="margin-left: 15px; font-weight: bold;"></span>
+<body class="theme-light">
+    <div class="app-container">
+        <!-- TransTRACK Signature Red Sidebar (Collapsible) -->
+        <aside class="app-sidebar" id="app-sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-header-top">
+                    <!-- TransTRACK Official Logo Card -->
+                    <div class="brand-logo-card" title="TransTRACK">
+                        <div class="brand-logo-clip">
+                            <img src="/full-logo.png" alt="TransTRACK Logo" class="brand-logo-img">
+                        </div>
+                    </div>
+                    <button class="theme-toggle-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌙</button>
+                </div>
+                <div class="sidebar-project-info">
+                    <div class="project-short-name">VST</div>
+                    <div class="project-long-name">Vibration Simulator Table</div>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="sidebar-nav">
+                <button class="nav-link active" id="btn-nav-monitor" onclick="switchTab('monitor')" title="Data Monitor">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">Data Monitor</span>
+                </button>
+                <button class="nav-link" id="btn-nav-config" onclick="switchTab('config')" title="Configuration">
+                    <span class="nav-icon">⚙</span>
+                    <span class="nav-label">Configuration</span>
+                </button>
+            </nav>
+
+            <!-- Sidebar Hardware & Status Info -->
+            <div class="sidebar-bottom">
+                <div class="sidebar-mini-status" id="sidebar-mini-status" title="System Online">
+                    <span class="status-dot online"></span>
+                </div>
+                <div class="sidebar-info-card">
+                    <div class="sidebar-info-title">System Status</div>
+                    <div class="sidebar-status-row">
+                        <span class="status-dot online" id="conn-dot"></span>
+                        <span id="conn-text" class="status-name">ESP32 ONLINE</span>
+                    </div>
+                    <div class="sidebar-meta-text">
+                        <div>Host: 192.168.4.1</div>
+                        <div>IMU: BMI160 &bull; 200 Hz</div>
+                        <div>Pitch: BTS7960 &bull; 20 kHz</div>
+                        <div>Vibe: BTS7960 &bull; 20 kHz</div>
+                    </div>
+                </div>
+                <div class="sidebar-copyright">
+                    TransTRACK &bull; VST (Vibration Simulator Table)
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="app-main">
+            <!-- Top App Bar with Title & Status Pills -->
+            <header class="main-header">
+                <div class="header-top-row">
+                    <div class="title-with-burger">
+                        <button class="sidebar-toggle-btn" id="header-sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle Sidebar" title="Toggle Sidebar">☰</button>
+                        <div class="header-titles">
+                            <h1 id="page-heading">Data Monitor</h1>
+                            <span class="page-project-badge">VST &bull; Vibration Simulator Table</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Horizontal Status Pills Row (TransTRACK Device Logger style) -->
+                <div class="status-pills-container">
+                    <div class="status-pill pill-blue" id="pill-wifi">
+                        <span class="pill-icon">📶</span>
+                        <span class="pill-text">WiFi: AP Mode</span>
+                    </div>
+                    <div class="status-pill state-calibrating" id="pill-state">
+                        <span class="pill-icon" id="icon-pill-state">⏳</span>
+                        <span class="pill-text" id="val-pill-state">State: CALIBRATING</span>
+                    </div>
+                    <div class="status-pill pill-teal" id="pill-mode">
+                        <span class="pill-icon">🎛</span>
+                        <span class="pill-text" id="val-pill-mode">Mode: Stabilized</span>
+                    </div>
+                    <div class="status-pill pill-red" id="pill-dir">
+                        <span class="pill-icon">🔄</span>
+                        <span class="pill-text" id="val-pill-dir">DIR: FWD (+)</span>
+                    </div>
+                    <div class="status-pill pill-green" id="pill-pitch">
+                        <span class="pill-icon">🎯</span>
+                        <span class="pill-text" id="val-pill-pitch">Pitch: +0.00&deg;</span>
+                    </div>
+                    <div class="status-pill pill-green" id="pill-vib">
+                        <span class="pill-icon">〰</span>
+                        <span class="pill-text" id="val-pill-vib">Vib: 0.000 g</span>
+                    </div>
+                    <div class="status-pill pill-slate" id="pill-dwell">
+                        <span class="pill-icon">⏱</span>
+                        <span class="pill-text" id="val-pill-dwell">Dwell: OFF</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- TAB 1: DATA MONITOR (Live Telemetry & Graphs) -->
+            <section id="tab-monitor" class="tab-content active">
+                <div class="cards-grid">
+                    <!-- 1. Pitch Axis Orientation & Angle Tracking -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <h3>PITCH ORIENTATION &amp; TRACKING (&deg;)</h3>
+                                <div class="card-values">
+                                    Live: <strong id="val-pitch-live" class="c-blue">0.00&deg;</strong> &nbsp;|&nbsp;
+                                    Target: <strong id="val-pitch-target" class="c-amber">0.00&deg;</strong> &nbsp;|&nbsp;
+                                    Slew: <strong id="val-pitch-slew" class="c-red">0.00&deg;</strong>
+                                </div>
+                            </div>
+                            <div class="card-legends">
+                                <span class="legend"><span class="dot bg-blue"></span>Live Gyro</span>
+                                <span class="legend"><span class="dot bg-amber"></span>Target</span>
+                                <span class="legend"><span class="dot bg-red"></span>Slew</span>
+                            </div>
+                        </div>
+                        <canvas id="pitchAngleCanvas" width="800" height="150"></canvas>
+                    </div>
+
+                    <!-- 2. Pitch Motor Drive Output (PWM) -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <h3>PITCH MOTOR DRIVE EFFORT (SIGNED PWM)</h3>
+                                <div class="card-values">
+                                    PWM: <strong id="val-pitch-pwm" class="c-red">0</strong> / 1023 &nbsp;|&nbsp;
+                                    Direction: <strong id="val-pitch-pwm-dir" class="c-slate">--</strong>
+                                </div>
+                            </div>
+                            <div class="card-legends">
+                                <span class="legend"><span class="dot bg-red"></span>PWM Effort</span>
+                            </div>
+                        </div>
+                        <canvas id="pitchPwmCanvas" width="800" height="150"></canvas>
+                    </div>
+
+                    <!-- 3. Target Vibration (g) -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <h3>VIBRATION TARGET (G)</h3>
+                                <div class="card-values">
+                                    Target: <strong id="val-target" class="c-amber">[ 0.000 g ]</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <canvas id="targetGCanvas" width="800" height="140"></canvas>
+                    </div>
+
+                    <!-- 4. Pure Raw Vibration (g) -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <h3>PURE VIBRATION NORM (G)</h3>
+                                <div class="card-values">
+                                    Raw: <strong id="val-pure" class="c-blue">[ 0.000 g ]</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <canvas id="pureGCanvas" width="800" height="140"></canvas>
+                    </div>
+
+                    <!-- 5. Calibrated Vibration (g) -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <h3>CALIBRATED VIBRATION (G)</h3>
+                                <div class="card-values">
+                                    Tilt-Compensated: <strong id="val-calG" class="c-green">[ 0.000 g ]</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <canvas id="calibratedGCanvas" width="800" height="140"></canvas>
+                    </div>
+
+                    <!-- 6. Calibrated Acceleration (m/s²) -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <h3>CALIBRATED ACCELERATION (M/S&sup2;)</h3>
+                                <div class="card-values">
+                                    Acceleration: <strong id="val-calMs2" class="c-red">[ 0.000 m/s&sup2; ]</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <canvas id="calibratedMs2Canvas" width="800" height="140"></canvas>
+                    </div>
+
+                    <!-- 7. Dominant Frequency (Hz) -->
+                    <div class="dashboard-card card-full-width">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <h3>DOMINANT VIBRATION FREQUENCY (HZ)</h3>
+                                <div class="card-values">
+                                    Frequency: <strong id="val-freq" class="c-purple">[ 0.00 Hz ]</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <canvas id="freqCanvas" width="800" height="140"></canvas>
+                    </div>
+
+                    <!-- 8. Output Combined -->
+                    <div class="dashboard-card card-full-width">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <h3>OUTPUT COMBINED (REAL-TIME)</h3>
+                                <div class="card-values">
+                                    Target G: <strong id="val-targetG" class="c-amber">0.000</strong> &nbsp;|&nbsp;
+                                    PWM: <strong id="val-pwm" class="c-purple">0</strong> &nbsp;|&nbsp;
+                                    G: <strong id="val-combG" class="c-red">0.000</strong>
+                                </div>
+                            </div>
+                            <div class="card-legends">
+                                <span class="legend"><span class="dot bg-amber"></span>Target G</span>
+                                <span class="legend"><span class="dot bg-purple"></span>PWM</span>
+                                <span class="legend"><span class="dot bg-red"></span>G</span>
+                            </div>
+                        </div>
+                        <canvas id="combinedCanvas" width="800" height="150"></canvas>
+                    </div>
+
+                    <!-- 9. History 1 Jam -->
+                    <div class="dashboard-card card-full-width">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <h3>HISTORY 1 JAM (1-HOUR ROLLING WINDOW)</h3>
+                                <div class="card-values">
+                                    Target G: <strong id="val-histTarget" class="c-amber">0.000</strong> &nbsp;|&nbsp;
+                                    PWM: <strong id="val-histPwm" class="c-purple">0</strong> &nbsp;|&nbsp;
+                                    G: <strong id="val-histG" class="c-red">0.000</strong>
+                                </div>
+                            </div>
+                            <div class="card-legends">
+                                <span class="legend"><span class="dot bg-amber"></span>Target G</span>
+                                <span class="legend"><span class="dot bg-purple"></span>PWM</span>
+                                <span class="legend"><span class="dot bg-red"></span>G</span>
+                            </div>
+                        </div>
+                        <canvas id="historyCanvas" width="800" height="150"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: CONFIGURATION (PID Tuning & Hardware Safeguards) -->
+            <section id="tab-config" class="tab-content">
+                <div class="config-grid">
+                    <!-- Vibration Motor PID Card -->
+                    <div class="dashboard-card config-card">
+                        <div class="config-card-header">
+                            <div class="config-title-icon">〰</div>
+                            <div>
+                                <h3>Vibration Motor PID Tuning</h3>
+                                <p class="config-desc">Controls 20 kHz 8-bit vibration actuator response</p>
+                            </div>
+                        </div>
+                        <div class="config-inputs-row">
+                            <div class="form-group">
+                                <label for="input-kp">KP (Proportional)</label>
+                                <input type="number" id="input-kp" step="0.001" value="0.130">
+                            </div>
+                            <div class="form-group">
+                                <label for="input-ki">KI (Integral)</label>
+                                <input type="number" id="input-ki" step="0.001" value="0.300">
+                            </div>
+                            <div class="form-group">
+                                <label for="input-kd">KD (Derivative)</label>
+                                <input type="number" id="input-kd" step="0.001" value="0.000">
+                            </div>
+                        </div>
+                        <div class="config-actions">
+                            <button id="btn-update-vib-pid" class="btn btn-primary" onclick="updatePID()">
+                                Save Vibration PID
+                            </button>
+                            <span id="update-status" class="status-msg"></span>
+                        </div>
+                    </div>
+
+                    <!-- Pitch Axis Motor PID Card -->
+                    <div class="dashboard-card config-card">
+                        <div class="config-card-header">
+                            <div class="config-title-icon">🎯</div>
+                            <div>
+                                <h3>Pitch Axis Motor PID Tuning</h3>
+                                <p class="config-desc">Controls 20 kHz 10-bit BTS7960 pitch table positioning</p>
+                            </div>
+                        </div>
+                        <div class="config-inputs-row">
+                            <div class="form-group">
+                                <label for="input-pitch-kp">KP (Proportional)</label>
+                                <input type="number" id="input-pitch-kp" step="0.1" value="20.00">
+                            </div>
+                            <div class="form-group">
+                                <label for="input-pitch-ki">KI (Integral)</label>
+                                <input type="number" id="input-pitch-ki" step="0.1" value="2.00">
+                            </div>
+                            <div class="form-group">
+                                <label for="input-pitch-kd">KD (Derivative)</label>
+                                <input type="number" id="input-pitch-kd" step="0.1" value="1.00">
+                            </div>
+                        </div>
+                        <div class="config-actions">
+                            <button id="btn-update-pitch-pid" class="btn btn-primary" onclick="updatePitchPID()">
+                                Save Pitch PID
+                            </button>
+                            <span id="update-pitch-status" class="status-msg"></span>
+                        </div>
+                    </div>
+
+                    <!-- Hardware Specifications & Operational Safeguards Card -->
+                    <div class="dashboard-card config-card card-full-width">
+                        <div class="config-card-header">
+                            <div class="config-title-icon">🛡</div>
+                            <div>
+                                <h3>Firmware &amp; Operational Safety Limits</h3>
+                                <p class="config-desc">Configured physical constants in constant.h</p>
+                            </div>
+                        </div>
+                        <div class="specs-grid">
+                            <div class="spec-item">
+                                <span class="spec-label">Pitch Slew Rate</span>
+                                <span class="spec-val">5.0&deg; / s</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Auto-Homing Tolerance</span>
+                                <span class="spec-val">&plusmn; 0.5&deg;</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Over-Tilt Safety Fault</span>
+                                <span class="spec-val">&plusmn; 20.0&deg;</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Static Friction Threshold</span>
+                                <span class="spec-val">120 / 1023 (11.7%)</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Anti-Hunting Deadband</span>
+                                <span class="spec-val">&plusmn; 0.15&deg;</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Active Brake Mode</span>
+                                <span class="spec-val">Low-Side Dynamic</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
-    <div class="graph-container">
-        
-        <div class="graph-wrapper">
-            <h3>Target (g) <span id="val-target" style="color: orange;">[ 0.00 ]</span></h3>
-            <canvas id="targetGCanvas" width="800" height="150"></canvas>
-        </div>
-        
-        <div class="graph-wrapper">
-            <h3>Pure (g) <span id="val-pure" style="color: blue;">[ 0.00 ]</span></h3>
-            <canvas id="pureGCanvas" width="800" height="150"></canvas>
-        </div>
-        
-        <div class="graph-wrapper">
-            <h3>Calibrated (g) <span id="val-calG" style="color: green;">[ 0.00 ]</span></h3>
-            <canvas id="calibratedGCanvas" width="800" height="150"></canvas>
-        </div>
-        
-        <div class="graph-wrapper">
-            <h3>Calibrated (m/s&sup2;) <span id="val-calMs2" style="color: red;">[ 0.00 ]</span></h3>
-            <canvas id="calibratedMs2Canvas" width="800" height="150"></canvas>
-        </div>
-        
-        <div class="graph-wrapper">
-            <h3>Dominant Frequency <span id="val-freq" style="color: purple;">[ 0.00 ]</span></h3>
-            <canvas id="freqCanvas" width="800" height="150"></canvas>
-        </div>
-        
-        <div class="graph-wrapper">
-            <h3>Output Combined 
-                <span style="font-size: 14px; font-weight: normal; margin-left: 10px;">
-                    ( Target G: <span id="val-targetG" style="color: #FF9800; font-weight: bold;">0</span> | 
-                    PWM: <span id="val-pwm" style="color: #9C27B0; font-weight: bold;">0</span> | 
-                    G: <span id="val-combG" style="color: red; font-weight: bold;">0.00</span> )
-                </span>
-            </h3>
-            <canvas id="combinedCanvas" width="800" height="150"></canvas>
-        </div>
-        
-        <div class="graph-wrapper">
-            <h3>History 1 Jam
-                <span style="font-size: 14px; font-weight: normal; margin-left: 10px;">
-                    ( Target G: <span id="val-histTarget" style="color: #FF9800; font-weight: bold;">0</span> | 
-                    PWM: <span id="val-histPwm" style="color: #9C27B0; font-weight: bold;">0</span> | 
-                    G: <span id="val-histG" style="color: red; font-weight: bold;">0.00</span> )
-                </span>
-            </h3>
-            <canvas id="historyCanvas" width="800" height="150"></canvas>
-        </div>
-        
-    </div> <script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
