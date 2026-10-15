@@ -428,6 +428,31 @@ async function fetchData() {
         document.getElementById('val-pitch-pwm-dir').innerText = (json.pitch_pwm > 0 ? "FWD (Right Up)" : (json.pitch_pwm < 0 ? "REV (Left Up)" : "HOLD"));
 
         document.getElementById('val-target').innerText = "[ " + json.target_g.toFixed(3) + " g ]";
+        const safetyBadge = document.getElementById('badge-safety-cap');
+        const specVibSafety = document.getElementById('spec-vib-safety');
+        const specVibSafetyVal = document.getElementById('spec-vib-safety-val');
+        const isVibSafetyOn = !!json.vib_safety;
+
+        if (isVibSafetyOn) {
+            const maxGStr = ((typeof json.vib_safety_max_g === 'number') ? json.vib_safety_max_g : 1.0).toFixed(3);
+            if (safetyBadge) {
+                safetyBadge.style.display = "inline-block";
+                safetyBadge.innerText = "🛡️ Cap: " + maxGStr + " g";
+            }
+            if (specVibSafety) {
+                specVibSafety.style.display = "flex";
+            }
+            if (specVibSafetyVal) {
+                specVibSafetyVal.innerText = maxGStr + " g (Max)";
+            }
+        } else {
+            if (safetyBadge) {
+                safetyBadge.style.display = "none";
+            }
+            if (specVibSafety) {
+                specVibSafety.style.display = "none";
+            }
+        }
         document.getElementById('val-pure').innerText = "[ " + json.vibration_g.toFixed(3) + " g ]";
         document.getElementById('val-calG').innerText = "[ " + json.calibrated_g.toFixed(3) + " g ]";
         document.getElementById('val-calMs2').innerText = "[ " + json.calibrated_ms2.toFixed(3) + " m/s² ]";
@@ -477,7 +502,8 @@ async function fetchData() {
         graphs.combined.dataG.push(json.calibrated_g || 0);
         graphs.combined.dataG.shift();
 
-        drawGraph(graphs.targetG, "g", "#D97706", 16);
+        const targetMaxG = (isVibSafetyOn && json.vib_safety_max_g > 0) ? Math.max(1.2, json.vib_safety_max_g * 1.25) : 16;
+        drawGraph(graphs.targetG, "g", "#D97706", targetMaxG);
         drawGraph(graphs.pureG, "g", "#0284C7", 16);
         drawGraph(graphs.calG, "g", "#10B981", 16);
         drawGraph(graphs.calMs2, "m/s²", "#E51E25", 160);

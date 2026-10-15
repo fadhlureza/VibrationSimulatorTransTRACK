@@ -661,6 +661,19 @@ canvas {
     font-feature-settings: "tnum";
 }
 
+.badge-safety-cap {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    color: #10B981;
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
 .card-legends {
     display: flex;
     align-items: center;

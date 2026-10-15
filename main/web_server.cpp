@@ -65,7 +65,7 @@ static esp_err_t data_handler(httpd_req_t *req)
     const char* mode_names[] = {"Stabilized", "Interval", "Full Manual"};
     const char* mode_str = (panel_st.mode <= MODE_MANUAL) ? mode_names[panel_st.mode] : "Unknown";
 
-    char resp_str[640];
+    char resp_str[768];
     snprintf(resp_str, sizeof(resp_str),
         "{"
         "\"target_g\": %.3f,"
@@ -89,7 +89,9 @@ static esp_err_t data_handler(httpd_req_t *req)
         "\"pot2_s\": %.1f,"
         "\"dwell_rem\": %.1f,"
         "\"dwell_total\": %.1f,"
-        "\"imu_calibrated\": %d"
+        "\"imu_calibrated\": %d,"
+        "\"vib_safety\": %d,"
+        "\"vib_safety_max_g\": %.3f"
         "}",
         g_target_g, g_vibration_g, g_calibrated_g, g_calibrated_ms2, g_dominant_freq_hz, g_pwm_value,
         pitch_control_get_state_str(),
@@ -107,7 +109,9 @@ static esp_err_t data_handler(httpd_req_t *req)
         panel_st.raw_pot2_s,
         pitch_telem.dwell_remaining_s,
         pitch_telem.dwell_total_s,
-        imu_snap.is_calibrated ? 1 : 0
+        imu_snap.is_calibrated ? 1 : 0,
+        VIB_SAFETY ? 1 : 0,
+        VIB_SAFETY_MAX_G
     );
             
     httpd_resp_set_type(req, "application/json");

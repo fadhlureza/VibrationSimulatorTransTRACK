@@ -99,11 +99,33 @@ extern "C" void app_main(void) {
 
         g_target_g = panel_st.vib_target_g;
 
+        // Vibration Safety Cap
+#if VIB_SAFETY
+        if (g_target_g > VIB_SAFETY_MAX_G) {
+            g_target_g = VIB_SAFETY_MAX_G;
+        }
+#endif
+
         int target_g_scaled = (int)(g_target_g * 1000.0f);
         int actual_g_scaled = (int)(g_calibrated_g * 1000.0f);
 
         // Vibration motor only runs once pitch motor has homed to 0.0 deg (SYS_RUNNING)
         bool vibrationRunning = (sys_state == SYS_RUNNING);
+
+        // Vibration Safety Cap
+#if VIB_SAFETY
+        // protect mechanical table if vibration spikes/resonates
+        static int s_over_g_ticks = 0;
+        if (vibrationRunning && g_calibrated_g > VIB_SAFETY_OVER_G_TRIP) {
+            if (++s_over_g_ticks >= 20) { // 200 ms continuous over-G
+                printf("[VIB SAFETY ALARM] Calibrated vibration (%.3f g) exceeded trip limit (%.2f g)! Tripping motor.\n",
+                       g_calibrated_g, VIB_SAFETY_OVER_G_TRIP);
+                vibrationRunning = false;
+            }
+        } else {
+            s_over_g_ticks = 0;
+        }
+#endif
 
         if (vibrationRunning) {
             g_pwm_value = myPID.step(target_g_scaled, actual_g_scaled);
@@ -138,8 +160,15 @@ extern "C" void app_main(void) {
             
             printf("counter: %d | ", counter++);
 
-            printf("SysState: %s | Mode: %d | Dir: %s | Target: %.3f g | Aktual: %.3f g\n", 
-                   pitch_control_get_state_str(), (int)panel_st.mode, panel_st.dir == DIR_FORWARD ? "FWD" : "REV", g_target_g, g_calibrated_g);
+#if VIB_SAFETY
+            char cap_tag[24];
+            snprintf(cap_tag, sizeof(cap_tag), " [CAP:%.1fG]", (double)VIB_SAFETY_MAX_G);
+#else
+            const char* cap_tag = "";
+#endif
+            printf("SysState: %s | Mode: %d | Dir: %s | Target: %.3f g%s | Aktual: %.3f g\n", 
+                   pitch_control_get_state_str(), (int)panel_st.mode, panel_st.dir == DIR_FORWARD ? "FWD" : "REV", 
+                   g_target_g, cap_tag, g_calibrated_g);
             
             printf("vibration: %.3f g (%.3f m/s2) | calibrated vibration: %.3f m/s2 | dominant frequency: %.2f Hz | dX: %.3f | dY: %.3f | dZ: %.3f\n", 
                    vibration, vibration_ms2, vibration_ms2_calibrated, freq_hz, deltaX, deltaY, deltaZ);

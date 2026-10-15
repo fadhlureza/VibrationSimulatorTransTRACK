@@ -72,6 +72,11 @@
 #define POT2_MAX_SEC            300.0f
 #define MODE1_LOCKED_G          1.000f
 
+// Vibration Safety Configuration
+#define VIB_SAFETY              1       // 1 = Safety feature active & shown to user; 0 = Safety off & completely hidden from user
+#define VIB_SAFETY_MAX_G        1.000f  // Maximum allowable target vibration in G across all modes
+#define VIB_SAFETY_OVER_G_TRIP  1.800f  // Emergency trip cutoff if measured vibration exceeds this
+
 // IMU parameters
 #define BMI160_ADDR             0x68
 #define BMI160_REG_CHIP_ID      0x00

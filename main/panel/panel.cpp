@@ -171,6 +171,13 @@ static void panel_task(void *pvParameters) {
                 break;
         }
 
+        // Vibration Safety Cap
+        #if VIB_SAFETY
+        if (active_vib_g > VIB_SAFETY_MAX_G) {
+            active_vib_g = VIB_SAFETY_MAX_G;
+        }
+        #endif
+
         // --- 7. Commit state atomically ---
         portENTER_CRITICAL(&s_panel_mux);
         s_panel_state.mode = current_mode;
