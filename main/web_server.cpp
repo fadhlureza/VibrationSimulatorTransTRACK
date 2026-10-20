@@ -65,7 +65,7 @@ static esp_err_t data_handler(httpd_req_t *req)
     const char* mode_names[] = {"Stabilized", "Interval", "Full Manual"};
     const char* mode_str = (panel_st.mode <= MODE_MANUAL) ? mode_names[panel_st.mode] : "Unknown";
 
-    char resp_str[768];
+    char resp_str[896];
     snprintf(resp_str, sizeof(resp_str),
         "{"
         "\"target_g\": %.3f,"
@@ -89,6 +89,9 @@ static esp_err_t data_handler(httpd_req_t *req)
         "\"pot2_s\": %.1f,"
         "\"dwell_rem\": %.1f,"
         "\"dwell_total\": %.1f,"
+        "\"slew_gain\": %.2f,"
+        "\"effective_slew_s\": %.1f,"
+        "\"effective_slew_dps\": %.2f,"
         "\"imu_calibrated\": %d,"
         "\"vib_safety\": %d,"
         "\"vib_safety_max_g\": %.3f"
@@ -109,6 +112,9 @@ static esp_err_t data_handler(httpd_req_t *req)
         panel_st.raw_pot2_s,
         pitch_telem.dwell_remaining_s,
         pitch_telem.dwell_total_s,
+        pitch_telem.slew_gain,
+        pitch_telem.effective_slew_time_s,
+        pitch_telem.effective_slew_dps,
         imu_snap.is_calibrated ? 1 : 0,
         VIB_SAFETY ? 1 : 0,
         VIB_SAFETY_MAX_G
@@ -182,6 +188,7 @@ static esp_err_t update_pitch_pid_handler(httpd_req_t *req)
     cJSON *kp_json = cJSON_GetObjectItem(root, "kp");
     cJSON *ki_json = cJSON_GetObjectItem(root, "ki");
     cJSON *kd_json = cJSON_GetObjectItem(root, "kd");
+    cJSON *slew_gain_json = cJSON_GetObjectItem(root, "slew_gain");
 
     if (kp_json && ki_json && kd_json) {
         float kp = (float)kp_json->valuedouble;
@@ -190,10 +197,15 @@ static esp_err_t update_pitch_pid_handler(httpd_req_t *req)
         pitch_control_update_pid(kp, ki, kd);
     }
 
+    if (slew_gain_json) {
+        float slew_gain = (float)slew_gain_json->valuedouble;
+        pitch_control_set_slew_gain(slew_gain);
+    }
+
     cJSON_Delete(root);
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, "{\"status\": \"Pitch PID coefficients updated\"}");
+    httpd_resp_sendstr(req, "{\"status\": \"Pitch configuration updated\"}");
     return ESP_OK;
 }
 
@@ -201,11 +213,12 @@ static esp_err_t get_pids_handler(httpd_req_t *req)
 {
     float pitch_kp = 0, pitch_ki = 0, pitch_kd = 0;
     pitch_control_get_pid(&pitch_kp, &pitch_ki, &pitch_kd);
+    float pitch_slew_gain = pitch_control_get_slew_gain();
 
-    char resp_str[192];
+    char resp_str[256];
     snprintf(resp_str, sizeof(resp_str),
-        "{\"vib_kp\": %.4f, \"vib_ki\": %.4f, \"vib_kd\": %.4f, \"pitch_kp\": %.2f, \"pitch_ki\": %.2f, \"pitch_kd\": %.2f}",
-        g_active_kp, g_active_ki, g_active_kd, pitch_kp, pitch_ki, pitch_kd);
+        "{\"vib_kp\": %.4f, \"vib_ki\": %.4f, \"vib_kd\": %.4f, \"pitch_kp\": %.2f, \"pitch_ki\": %.2f, \"pitch_kd\": %.2f, \"pitch_slew_gain\": %.2f}",
+        g_active_kp, g_active_ki, g_active_kd, pitch_kp, pitch_ki, pitch_kd, pitch_slew_gain);
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);

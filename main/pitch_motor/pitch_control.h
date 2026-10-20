@@ -23,6 +23,9 @@ struct pitch_telemetry_t {
     panel_dir_t  active_dir;
     float        dwell_remaining_s;
     float        dwell_total_s;
+    float        slew_gain;             // Live multiplier (default 0.50 = 50%)
+    float        effective_slew_time_s; // POT2 * Gain (clamped >= 1.0s)
+    float        effective_slew_dps;    // Live calculated deg/s for Mode 1
 };
 
 // Initialize pitch control task on Core 1 (100 Hz)
@@ -44,3 +47,7 @@ pitch_telemetry_t pitch_control_get_telemetry();
 // Pitch PID tuning
 void pitch_control_update_pid(float kp, float ki, float kd);
 void pitch_control_get_pid(float *kp, float *ki, float *kd);
+
+// Pitch Slew Rate Gain control
+void pitch_control_set_slew_gain(float gain);
+float pitch_control_get_slew_gain();

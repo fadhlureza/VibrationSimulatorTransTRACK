@@ -41,6 +41,7 @@ static FastPID s_pitch_pid(PITCH_KP, PITCH_KI, PITCH_KD, PITCH_HZ, 16, true);
 static float s_active_pitch_kp = PITCH_KP;
 static float s_active_pitch_ki = PITCH_KI;
 static float s_active_pitch_kd = PITCH_KD;
+static float s_pitch_slew_gain = PITCH_SLEW_GAIN_DEFAULT;
 static bool s_pid_reconfigure_pending = false;
 
 // Telemetry cache
@@ -54,14 +55,17 @@ static pitch_telemetry_t s_telemetry_cache = {
     .active_mode = MODE_STABILIZED,
     .active_dir = DIR_FORWARD,
     .dwell_remaining_s = 0.0f,
-    .dwell_total_s = 0.0f
+    .dwell_total_s = 0.0f,
+    .slew_gain = PITCH_SLEW_GAIN_DEFAULT,
+    .effective_slew_time_s = 0.0f,
+    .effective_slew_dps = PITCH_SLEW_RATE_DPS
 };
 
 static void pitch_task_func(void *pvParameters) {
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t period_ticks = pdMS_TO_TICKS(10); // 100 Hz (10 ms)
     const float dt = 0.01f;
-    const float max_step = PITCH_SLEW_RATE_DPS * dt; // 0.05 deg/step at 5 deg/s
+    const float default_max_step = PITCH_SLEW_RATE_DPS * dt; // 0.05 deg/step at 5 deg/s
 
     while (1) {
         vTaskDelayUntil(&last_wake_time, period_ticks);
@@ -147,6 +151,27 @@ static void pitch_task_func(void *pvParameters) {
             s_last_mode = panel_st.mode;
         }
 
+        // Calculate dynamic slew parameters for Mode 1 (T_slew = POT2 * Slew_Gain)
+        float live_slew_gain;
+        taskENTER_CRITICAL(&s_pitch_mux);
+        live_slew_gain = s_pitch_slew_gain;
+        taskEXIT_CRITICAL(&s_pitch_mux);
+
+        float pot2_val = panel_st.raw_pot2_s;
+        float effective_slew_time_s = pot2_val * live_slew_gain;
+        if (effective_slew_time_s < PITCH_SLEW_TIME_MIN_S) {
+            effective_slew_time_s = PITCH_SLEW_TIME_MIN_S;
+        }
+
+        float stroke_deg = fabsf(panel_st.pitch_angle_deg);
+        if (stroke_deg < 0.5f) stroke_deg = 1.0f; // Baseline stroke (1.0 deg min)
+
+        float mode1_dps = stroke_deg / effective_slew_time_s;
+        if (mode1_dps > PITCH_MAX_SLEW_RATE_DPS) {
+            mode1_dps = PITCH_MAX_SLEW_RATE_DPS;
+        }
+        float mode1_slew_step = mode1_dps * dt;
+
         // State machine processing
         switch (s_sys_state) {
             case SYS_CALIBRATING:
@@ -184,11 +209,11 @@ static void pitch_task_func(void *pvParameters) {
             case SYS_HOMING: {
                 s_target_pitch_deg = 0.0f;
 
-                // Slew setpoint toward 0.0 deg at 5 deg/s
-                if (s_slew_pitch_deg < -max_step) {
-                    s_slew_pitch_deg += max_step;
-                } else if (s_slew_pitch_deg > max_step) {
-                    s_slew_pitch_deg -= max_step;
+                // Slew setpoint toward 0.0 deg at default safe 5 deg/s
+                if (s_slew_pitch_deg < -default_max_step) {
+                    s_slew_pitch_deg += default_max_step;
+                } else if (s_slew_pitch_deg > default_max_step) {
+                    s_slew_pitch_deg -= default_max_step;
                 } else {
                     s_slew_pitch_deg = 0.0f;
                 }
@@ -234,11 +259,11 @@ static void pitch_task_func(void *pvParameters) {
                         s_dwell_remaining_s = 0.0f;
                         s_dwell_duration_s = 0.0f;
 
-                        // Slew setpoint toward 0.0 deg at 5 deg/s (ensures smooth return if user switched from Mode 1 or 2 while tilted)
-                        if (s_slew_pitch_deg < -max_step) {
-                            s_slew_pitch_deg += max_step;
-                        } else if (s_slew_pitch_deg > max_step) {
-                            s_slew_pitch_deg -= max_step;
+                        // Slew setpoint toward 0.0 deg at default safe 5 deg/s (ensures smooth return if user switched from Mode 1 or 2 while tilted)
+                        if (s_slew_pitch_deg < -default_max_step) {
+                            s_slew_pitch_deg += default_max_step;
+                        } else if (s_slew_pitch_deg > default_max_step) {
+                            s_slew_pitch_deg -= default_max_step;
                         } else {
                             s_slew_pitch_deg = 0.0f;
                         }
@@ -247,6 +272,7 @@ static void pitch_task_func(void *pvParameters) {
 
                     case MODE_INTERVAL: {
                         // Mode 1: Automated 0° -> target (1..15°) -> 0° -> dwell (0..300s) cycle (CT-3.2, CT-2.1, CT-2.2, CT-2.3)
+                        // Transition slew time is governed by POT2 * Gain; flat dwell time remains POT2
                         s_dwell_duration_s = panel_st.interval_s;
 
                         switch (s_interval_substate) {
@@ -254,11 +280,11 @@ static void pitch_task_func(void *pvParameters) {
                                 s_target_pitch_deg = configured_target;
                                 s_dwell_remaining_s = 0.0f;
 
-                                // Slew setpoint toward configured target at 5 deg/s
-                                if (s_slew_pitch_deg < configured_target - max_step) {
-                                    s_slew_pitch_deg += max_step;
-                                } else if (s_slew_pitch_deg > configured_target + max_step) {
-                                    s_slew_pitch_deg -= max_step;
+                                // Slew setpoint toward configured target at dynamic step (POT2 * Gain)
+                                if (s_slew_pitch_deg < configured_target - mode1_slew_step) {
+                                    s_slew_pitch_deg += mode1_slew_step;
+                                } else if (s_slew_pitch_deg > configured_target + mode1_slew_step) {
+                                    s_slew_pitch_deg -= mode1_slew_step;
                                 } else {
                                     s_slew_pitch_deg = configured_target;
                                 }
@@ -268,8 +294,8 @@ static void pitch_task_func(void *pvParameters) {
                                     if (fabsf(current_pitch - configured_target) <= 0.6f || ++s_peak_catchup_ticks >= 50) {
                                         s_peak_catchup_ticks = 0;
                                         s_interval_substate = INTERVAL_TILT_RETURN;
-                                        printf("[PITCH] Mode 1: Peak target (%.2f deg) reached -> Immediately returning to 0.0 deg (no top pause)\n", 
-                                               configured_target);
+                                        printf("[PITCH] Mode 1: Peak target (%.2f deg) reached in ~%.1fs -> Immediately returning to 0.0 deg\n", 
+                                               configured_target, effective_slew_time_s);
                                     }
                                 } else {
                                     s_peak_catchup_ticks = 0;
@@ -281,11 +307,11 @@ static void pitch_task_func(void *pvParameters) {
                                 s_target_pitch_deg = 0.0f;
                                 s_dwell_remaining_s = 0.0f;
 
-                                // Slew setpoint back to 0.0 deg at 5 deg/s
-                                if (s_slew_pitch_deg < -max_step) {
-                                    s_slew_pitch_deg += max_step;
-                                } else if (s_slew_pitch_deg > max_step) {
-                                    s_slew_pitch_deg -= max_step;
+                                // Slew setpoint back to 0.0 deg at dynamic step (POT2 * Gain)
+                                if (s_slew_pitch_deg < -mode1_slew_step) {
+                                    s_slew_pitch_deg += mode1_slew_step;
+                                } else if (s_slew_pitch_deg > mode1_slew_step) {
+                                    s_slew_pitch_deg -= mode1_slew_step;
                                 } else {
                                     s_slew_pitch_deg = 0.0f;
                                 }
@@ -297,7 +323,8 @@ static void pitch_task_func(void *pvParameters) {
                                         s_interval_substate = INTERVAL_DWELL;
                                         s_dwell_start_tick = xTaskGetTickCount();
                                         s_dwell_remaining_s = s_dwell_duration_s;
-                                        printf("[PITCH] Mode 1: Returned to 0.0 deg -> Dwelling for %.1f s\n", s_dwell_duration_s);
+                                        printf("[PITCH] Mode 1: Returned to 0.0 deg in ~%.1fs -> Dwelling for %.1f s\n", 
+                                               effective_slew_time_s, s_dwell_duration_s);
                                     }
                                 } else {
                                     s_flat_catchup_ticks = 0;
@@ -330,17 +357,17 @@ static void pitch_task_func(void *pvParameters) {
                     }
 
                     case MODE_MANUAL: {
-                        // Mode 2: Direct knob tracking of DIR x pot_1 (1..15 deg) via 5 deg/s slew limiter (CT-3.3, CT-2.1, CT-2.2, CT-2.3)
+                        // Mode 2: Direct knob tracking of DIR x pot_1 (1..15 deg) via standard 5 deg/s slew limiter (CT-3.3, Opsi B)
                         s_target_pitch_deg = configured_target;
                         s_dwell_remaining_s = 0.0f;
                         s_dwell_duration_s = 0.0f;
 
-                        // Slew setpoint toward configured target at 5 deg/s
+                        // Slew setpoint toward configured target at standard safe 5 deg/s
                         // If DIR is flipped mid-motion, smoothly decelerates and sweeps to opposite side without pausing (CT-2.3)
-                        if (s_slew_pitch_deg < configured_target - max_step) {
-                            s_slew_pitch_deg += max_step;
-                        } else if (s_slew_pitch_deg > configured_target + max_step) {
-                            s_slew_pitch_deg -= max_step;
+                        if (s_slew_pitch_deg < configured_target - default_max_step) {
+                            s_slew_pitch_deg += default_max_step;
+                        } else if (s_slew_pitch_deg > configured_target + default_max_step) {
+                            s_slew_pitch_deg -= default_max_step;
                         } else {
                             s_slew_pitch_deg = configured_target;
                         }
@@ -392,6 +419,9 @@ static void pitch_task_func(void *pvParameters) {
         s_telemetry_cache.active_dir = panel_st.dir;
         s_telemetry_cache.dwell_remaining_s = s_dwell_remaining_s;
         s_telemetry_cache.dwell_total_s = s_dwell_duration_s;
+        s_telemetry_cache.slew_gain = live_slew_gain;
+        s_telemetry_cache.effective_slew_time_s = effective_slew_time_s;
+        s_telemetry_cache.effective_slew_dps = (panel_st.mode == MODE_INTERVAL) ? mode1_dps : PITCH_SLEW_RATE_DPS;
         taskEXIT_CRITICAL(&s_pitch_mux);
     }
 }
@@ -477,4 +507,20 @@ void pitch_control_get_pid(float *kp, float *ki, float *kd) {
     if (ki) *ki = s_active_pitch_ki;
     if (kd) *kd = s_active_pitch_kd;
     taskEXIT_CRITICAL(&s_pitch_mux);
+}
+
+void pitch_control_set_slew_gain(float gain) {
+    if (gain < PITCH_SLEW_GAIN_MIN) gain = PITCH_SLEW_GAIN_MIN;
+    if (gain > PITCH_SLEW_GAIN_MAX) gain = PITCH_SLEW_GAIN_MAX;
+    taskENTER_CRITICAL(&s_pitch_mux);
+    s_pitch_slew_gain = gain;
+    taskEXIT_CRITICAL(&s_pitch_mux);
+    printf("[PITCH] Updated Slew Gain: %.2f (%.0f%%)\n", gain, gain * 100.0f);
+}
+
+float pitch_control_get_slew_gain() {
+    taskENTER_CRITICAL(&s_pitch_mux);
+    float gain = s_pitch_slew_gain;
+    taskEXIT_CRITICAL(&s_pitch_mux);
+    return gain;
 }

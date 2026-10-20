@@ -297,7 +297,7 @@
                         <div class="config-card-header">
                             <div class="config-title-icon">🎯</div>
                             <div>
-                                <h3>Pitch Axis Motor PID Tuning</h3>
+                                <h3>Pitch Axis Motor Tuning</h3>
                                 <p class="config-desc">Controls 20 kHz 10-bit BTS7960 pitch table positioning</p>
                             </div>
                         </div>
@@ -314,10 +314,17 @@
                                 <label for="input-pitch-kd">KD (Derivative)</label>
                                 <input type="number" id="input-pitch-kd" step="0.1" value="1.00">
                             </div>
+                            <div class="form-group">
+                                <label for="input-pitch-slew-gain">Slew Gain (%) [Mode 1]</label>
+                                <input type="number" id="input-pitch-slew-gain" step="5" min="10" max="500" value="50">
+                            </div>
+                        </div>
+                        <div style="margin-top: 6px; margin-bottom: 12px; font-size: 0.85rem; color: #64748b;">
+                            ⏱️ Mode 1 Slew Duration: <strong>T<sub>slew</sub> = POT2 &times; Gain</strong> &rarr; <span id="slew-gain-preview" style="color: #2563eb; font-weight: 600;">(e.g. 15s &times; 50% = 7.5s)</span>
                         </div>
                         <div class="config-actions">
                             <button id="btn-update-pitch-pid" class="btn btn-primary" onclick="updatePitchPID()">
-                                Save Pitch PID
+                                Save Pitch Config
                             </button>
                             <span id="update-pitch-status" class="status-msg"></span>
                         </div>
@@ -335,7 +342,11 @@
                         <div class="specs-grid">
                             <div class="spec-item">
                                 <span class="spec-label">Pitch Slew Rate</span>
-                                <span class="spec-val">5.0&deg; / s</span>
+                                <span class="spec-val" id="spec-pitch-slew">5.0&deg; / s (Mode 1: Dynamic)</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Mode 1 Slew Gain</span>
+                                <span class="spec-val" id="spec-mode1-gain">50% (POT2 &times; 0.50)</span>
                             </div>
                             <div class="spec-item">
                                 <span class="spec-label">Auto-Homing Tolerance</span>

@@ -44,7 +44,12 @@
 #define PITCH_HZ                100.0f
 
 // Pitch motion limits & safety
-#define PITCH_SLEW_RATE_DPS     5.0f   // Max slew rate in degrees/sec (5 deg/s)
+#define PITCH_SLEW_RATE_DPS     5.0f   // Default/safe slew rate in degrees/sec (5 deg/s) for Homing & Mode 2
+#define PITCH_SLEW_GAIN_DEFAULT 0.50f  // Default Slew Gain for Mode 1 (50% of POT2 duration)
+#define PITCH_SLEW_GAIN_MIN     0.10f  // Minimum allowable gain (10%)
+#define PITCH_SLEW_GAIN_MAX     5.00f  // Maximum allowable gain (500%)
+#define PITCH_SLEW_TIME_MIN_S   1.00f  // Hardware protection minimum slew duration (1.0 s)
+#define PITCH_MAX_SLEW_RATE_DPS 15.0f  // Hardware safety ceiling for slew velocity (15 deg/s)
 #define PITCH_HOMED_TOLERANCE   0.5f   // Flat tolerance (+/- 0.5 deg)
 #define PITCH_MAX_ANGLE_FAULT   20.0f  // Hardware safety trip threshold (+/- deg)
 #define PITCH_PWM_MIN_DRIVE     120    // Min PWM to overcome friction on 10-bit (0..1023)

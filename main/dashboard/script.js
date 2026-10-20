@@ -362,6 +362,12 @@ async function fetchInitialPIDs() {
                 document.getElementById('input-pitch-ki').value = data.pitch_ki.toFixed(2);
                 document.getElementById('input-pitch-kd').value = data.pitch_kd.toFixed(2);
             }
+            if (data.pitch_slew_gain !== undefined) {
+                const gainPct = Math.round(data.pitch_slew_gain * 100);
+                const slewInput = document.getElementById('input-pitch-slew-gain');
+                if (slewInput) slewInput.value = gainPct;
+                updateSlewPreview(gainPct);
+            }
         }
     } catch (e) {
         console.warn("Could not load initial PID coefficients:", e);
@@ -451,6 +457,21 @@ async function fetchData() {
             }
             if (specVibSafety) {
                 specVibSafety.style.display = "none";
+            }
+        }
+
+        // Live Mode 1 Slew Rate & Gain in Specs Card
+        const specPitchSlew = document.getElementById('spec-pitch-slew');
+        const specMode1Gain = document.getElementById('spec-mode1-gain');
+        if (json.slew_gain !== undefined && specMode1Gain) {
+            const gainPct = Math.round(json.slew_gain * 100);
+            specMode1Gain.innerText = gainPct + "% (POT2 × " + json.slew_gain.toFixed(2) + ")";
+        }
+        if (specPitchSlew && json.effective_slew_dps !== undefined) {
+            if (json.mode === 1) {
+                specPitchSlew.innerText = json.effective_slew_dps.toFixed(1) + "° / s (T_slew ~" + (json.effective_slew_s || 0).toFixed(1) + "s)";
+            } else {
+                specPitchSlew.innerText = "5.0° / s (Safe Rate)";
             }
         }
         document.getElementById('val-pure').innerText = "[ " + json.vibration_g.toFixed(3) + " g ]";
@@ -575,37 +596,60 @@ async function updatePID() {
     }
 }
 
-// Update Pitch Motor PID
+// Helper to update Slew Gain calculation preview
+function updateSlewPreview(gainPct) {
+    const previewEl = document.getElementById('slew-gain-preview');
+    if (!previewEl) return;
+    const g = (gainPct || 50) / 100.0;
+    const dur15 = (15.0 * g).toFixed(1);
+    const dur10 = (10.0 * g).toFixed(1);
+    previewEl.innerText = "(e.g. 15s × " + gainPct + "% = " + dur15 + "s | 10s = " + dur10 + "s)";
+}
+
+// Update Pitch Motor PID & Slew Gain
 async function updatePitchPID() {
     const kp = parseFloat(document.getElementById('input-pitch-kp').value) || 0;
     const ki = parseFloat(document.getElementById('input-pitch-ki').value) || 0;
     const kd = parseFloat(document.getElementById('input-pitch-kd').value) || 0;
+    const slewGainPct = parseFloat(document.getElementById('input-pitch-slew-gain').value) || 50;
+    const slewGain = slewGainPct / 100.0;
 
     const statusText = document.getElementById('update-pitch-status');
-    statusText.innerText = "Saving Pitch PID...";
+    statusText.innerText = "Saving Pitch Config...";
     statusText.style.color = "#D97706";
 
     try {
         const response = await fetch('/api/update_pitch_pid', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ kp: kp, ki: ki, kd: kd })
+            body: JSON.stringify({ kp: kp, ki: ki, kd: kd, slew_gain: slewGain })
         });
     
         if (response.ok) {
-            statusText.innerText = "✓ Pitch PID updated successfully!";
+            statusText.innerText = "✓ Pitch Config updated successfully!";
             statusText.style.color = "#10B981";
+            updateSlewPreview(slewGainPct);
             setTimeout(() => { statusText.innerText = ""; }, 3000);
         } else {
-            statusText.innerText = "✗ Failed to update Pitch PID";
+            statusText.innerText = "✗ Failed to update Pitch Config";
             statusText.style.color = "#E51E25";
         } 
     } catch (err) {
-        console.error("Error updating pitch PID:", err);
+        console.error("Error updating pitch config:", err);
         statusText.innerText = "✗ Network error!";
         statusText.style.color = "#E51E25";
     }
 }
+
+// Input change listener for live calculation preview
+document.addEventListener("DOMContentLoaded", () => {
+    const slewInput = document.getElementById('input-pitch-slew-gain');
+    if (slewInput) {
+        slewInput.addEventListener('input', (e) => {
+            updateSlewPreview(parseFloat(e.target.value) || 50);
+        });
+    }
+});
 
 // Restore saved sidebar collapsed state on load
 try {
