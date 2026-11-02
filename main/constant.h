@@ -6,8 +6,8 @@
 // Panel GPIO inputs
 #define START_BTN_PIN       GPIO_NUM_8
 #define STOP_BTN_PIN        GPIO_NUM_3
-#define DIR_SWITCH_PIN      GPIO_NUM_9    // Low = FWD (+), High = REV (-)
-#define MODE_SWITCH_PIN_A   GPIO_NUM_10   // Low = Mode 0 (Stabilized)
+#define DIR_SWITCH_PIN      GPIO_NUM_46    // Low = FWD (+), High = REV (-)
+#define MODE_SWITCH_PIN_A   GPIO_NUM_19   // Low = Mode 0 (Stabilized)
 #define MODE_SWITCH_PIN_B   GPIO_NUM_21   // Low = Mode 2 (Manual); Both High = Mode 1 (Interval)
 
 // Vibration Motor GPIO pins (BTS7960)
@@ -25,10 +25,10 @@
 #define LEDC_FREQUENCY          20000 // 20 kHz
 
 // Pitch Motor GPIO pins (BTS7960, placeholder pins)
-#define PITCH_RPWM_PIN          15
-#define PITCH_LPWM_PIN          16
-#define PITCH_R_EN_PIN          17
-#define PITCH_L_EN_PIN          18
+#define PITCH_RPWM_PIN          36
+#define PITCH_LPWM_PIN          35
+#define PITCH_R_EN_PIN          39
+#define PITCH_L_EN_PIN          45
 
 // Pitch Motor LEDC (PWM) parameters
 #define LEDC_PITCH_TIMER        LEDC_TIMER_1
@@ -57,13 +57,13 @@
 
 // Potentiometer ADC parameters (ADC1 only, Wi-Fi safe)
 #define POT0_ADC_UNIT           ADC_UNIT_1
-#define POT0_ADC_CHANNEL        ADC_CHANNEL_0 // GPIO 1: Vibration target (0-16 g)
+#define POT0_ADC_CHANNEL        ADC_CHANNEL_1 // Vibration target (0-16 g)
 
 #define POT1_ADC_UNIT           ADC_UNIT_1
-#define POT1_ADC_CHANNEL        ADC_CHANNEL_5 // GPIO 6: Pitch tilt angle (1-15 deg)
+#define POT1_ADC_CHANNEL        ADC_CHANNEL_9 // Pitch tilt angle (1-15 deg)
 
 #define POT2_ADC_UNIT           ADC_UNIT_1
-#define POT2_ADC_CHANNEL        ADC_CHANNEL_6 // GPIO 7: Pitch interval (0-300 s)
+#define POT2_ADC_CHANNEL        ADC_CHANNEL_8 // Pitch interval (0-300 s)
 
 // Legacy alias
 #define POT_ADC_UNIT            POT0_ADC_UNIT
